@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed and SPY 1-Month Fibonacci Retracement Levels.">
+  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed Index and SPY 1-Month Fibonacci Retracements.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -206,9 +206,19 @@
 
     <!-- TAB 3: SPY FIBONACCI RETRACEMENT (1 MONTH) -->
     <section id="tab-fibonacci" class="tab-content is-hidden">
-      <div class="mb-4">
-        <h2 class="title is-5 mb-1">📐 SPY 1-Month Fibonacci Retracement Levels</h2>
-        <p class="subtitle is-7 has-text-grey">Calculated from the <strong>highest close</strong> to <strong>lowest close</strong> over the past 30 trading days.</p>
+      <div class="level mb-3">
+        <div class="level-left">
+          <div>
+            <h2 class="title is-5 mb-1" id="fibTitle">📐 SPY 1-Month Fibonacci Retracement Levels</h2>
+            <p class="subtitle is-7 has-text-grey" id="fibSubtitle">Reference: 0% = Lowest Close | 100% = Highest Close</p>
+          </div>
+        </div>
+        <div class="level-right">
+          <div class="buttons has-addons are-small" id="fibModeSelector">
+            <button class="button is-dark is-active is-info" data-mode="calendar">Prior Calendar Month</button>
+            <button class="button is-dark" data-mode="rolling">Rolling 30 Days</button>
+          </div>
+        </div>
       </div>
 
       <!-- Metric Highlights Cards -->
@@ -222,16 +232,16 @@
         </div>
         <div class="column is-6-tablet is-3-desktop">
           <div class="metric-card p-4">
-            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Highest Close (0.0%)</span>
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Highest Close (100.0%)</span>
             <div class="is-size-3 has-text-weight-bold has-text-danger-light mt-1" id="spyHighClose">$--</div>
-            <span class="is-size-7 has-text-grey" id="spyHighDate">Date: --</span>
+            <span class="is-size-7 has-text-grey" id="spyHighDate">Peak Date: --</span>
           </div>
         </div>
         <div class="column is-6-tablet is-3-desktop">
           <div class="metric-card p-4">
-            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Lowest Close (100.0%)</span>
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Lowest Close (0.0%)</span>
             <div class="is-size-3 has-text-weight-bold has-text-success mt-1" id="spyLowClose">$--</div>
-            <span class="is-size-7 has-text-grey" id="spyLowDate">Date: --</span>
+            <span class="is-size-7 has-text-grey" id="spyLowDate">Trough Date: --</span>
           </div>
         </div>
         <div class="column is-6-tablet is-3-desktop">
@@ -340,7 +350,7 @@
        1. INLINE SERVICE WORKER REGISTRATION (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v3';
+      const CACHE_NAME = 'fear-greed-singlefile-v4';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -413,6 +423,7 @@
     let currentRawData = null;
     let currentHistoryData = [];
     let currentFibData = null;
+    let currentFibMode = 'calendar';
 
     function formatRating(rating) {
       if (!rating) return 'UNKNOWN';
@@ -566,7 +577,6 @@
       return list;
     }
 
-    // Render 7 Indicators Cards
     function renderIndicatorsWithRaw(rawPayload) {
       const grid = document.getElementById('indicatorsGrid');
       if (!rawPayload) return;
@@ -605,7 +615,7 @@
     }
 
     /* ==========================================================================
-       3. SPY FIBONACCI RETRACEMENT VISUALIZATION
+       3. SPY FIBONACCI RETRACEMENT (0% = Low, 100% = High)
        ========================================================================== */
     function renderFibonacciTab(data) {
       if (!data) return;
@@ -624,15 +634,14 @@
       document.getElementById('spyRange').textContent = `$${range.toFixed(2)}`;
       document.getElementById('spyRangePct').textContent = `Monthly Swing: ${rangePct}%`;
 
-      // Status Tag
       const statusSpan = document.getElementById('spyCurrentStatus');
       if (cur >= high) {
-        statusSpan.innerHTML = `<span class="tag is-success is-light">Trading at or above 1M High</span>`;
+        statusSpan.innerHTML = `<span class="tag is-success is-light">Trading at or above 100% High</span>`;
       } else if (cur <= low) {
-        statusSpan.innerHTML = `<span class="tag is-danger is-light">Trading at or below 1M Low</span>`;
+        statusSpan.innerHTML = `<span class="tag is-danger is-light">Trading at or below 0% Low</span>`;
       } else {
-        const retrace = (((high - cur) / range) * 100).toFixed(1);
-        statusSpan.innerHTML = `<span class="tag is-info is-light">${retrace}% Retraced from Peak</span>`;
+        const pctFromLow = (((cur - low) / range) * 100).toFixed(1);
+        statusSpan.innerHTML = `<span class="tag is-info is-light">${pctFromLow}% Position in Monthly Range</span>`;
       }
 
       // Render Levels Table
@@ -668,7 +677,6 @@
       drawFibChart(data);
     }
 
-    // Draw SPY 1-Month Canvas Chart with Fibonacci Gridlines
     function drawFibChart(data) {
       const canvas = document.getElementById('fibChart');
       if (!canvas || !data || !data.history || data.history.length === 0) return;
@@ -683,8 +691,8 @@
 
       const w = rect.width;
       const h = rect.height;
-      const padLeft = 70;
-      const padRight = 30;
+      const padLeft = 75;
+      const padRight = 35;
       const padTop = 20;
       const padBottom = 30;
 
@@ -695,12 +703,11 @@
       const cur = Number(data.current_close);
       const chartRange = high - low || 1;
 
-      // Price to Y coordinate mapper
       const getY = (price) => {
         return padTop + (high - price) / chartRange * (h - padTop - padBottom);
       };
 
-      // 1. Draw Fibonacci Horizontal Gridlines
+      // 1. Draw Fibonacci Horizontal Lines
       data.levels.forEach(lvl => {
         const y = getY(lvl.price);
         ctx.beginPath();
@@ -711,7 +718,6 @@
         ctx.lineTo(w - padRight, y);
         ctx.stroke();
 
-        // Label on left
         ctx.setLineDash([]);
         ctx.fillStyle = lvl.color || '#cbd5e1';
         ctx.font = '10px monospace';
@@ -750,7 +756,6 @@
       ctx.lineWidth = 2.5;
       ctx.stroke();
 
-      // Point dots
       history.forEach((pt, i) => {
         const x = padLeft + i * stepX;
         const y = getY(pt.close);
@@ -760,7 +765,6 @@
         ctx.fill();
       });
 
-      // X-Axis Date markers
       ctx.fillStyle = '#64748b';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
@@ -769,6 +773,21 @@
         const midIdx = Math.floor(history.length / 2);
         ctx.fillText(history[midIdx].date.slice(5), padLeft + midIdx * stepX, h - 8);
         ctx.fillText(history[history.length - 1].date.slice(5), w - padRight, h - 8);
+      }
+    }
+
+    async function fetchFibonacci(mode = 'calendar') {
+      currentFibMode = mode;
+      try {
+        const res = await fetch(`/api/spy/fibonacci?mode=${mode}`);
+        if (res.ok) {
+          currentFibData = await res.json();
+          document.getElementById('fibSubtitle').textContent = 
+            `Period: ${currentFibData.period} (${currentFibData.start_date} to ${currentFibData.end_date}) | 0% = Low ($${currentFibData.lowest_close}) → 100% = High ($${currentFibData.highest_close})`;
+          renderFibonacciTab(currentFibData);
+        }
+      } catch (err) {
+        console.error('Fibonacci fetch error:', err);
       }
     }
 
@@ -905,7 +924,7 @@
         statusPill.className = 'tag is-warning is-light';
         statusPill.textContent = 'Updating...';
 
-        // 1. Full Snapshot (/api/get)
+        // 1. Snapshot (/api/get)
         const getRes = await fetch('/api/get');
         if (getRes.ok) {
           const getData = await getRes.json();
@@ -921,12 +940,8 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. SPY 1-Month Fibonacci Retracements (/api/spy/fibonacci)
-        const fibRes = await fetch('/api/spy/fibonacci');
-        if (fibRes.ok) {
-          currentFibData = await fibRes.json();
-          renderFibonacciTab(currentFibData);
-        }
+        // 3. SPY Fibonacci Retracements
+        await fetchFibonacci(currentFibMode);
 
         // 4. Daily History Series (/api/history?last=30d)
         const histRes = await fetch('/api/history?last=30d');
@@ -966,6 +981,15 @@
       });
     });
 
+    // Fibonacci Mode Selector (Prior Calendar Month vs Rolling 30 Days)
+    document.querySelectorAll('#fibModeSelector button').forEach(btn => {
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('#fibModeSelector button').forEach(b => b.classList.remove('is-active', 'is-info'));
+        btn.classList.add('is-active', 'is-info');
+        fetchFibonacci(btn.getAttribute('data-mode'));
+      });
+    });
+
     // History Period Switcher
     document.querySelectorAll('#historyPeriodSelector button').forEach(btn => {
       btn.addEventListener('click', async () => {
@@ -986,7 +1010,7 @@
       });
     });
 
-    // Copy JSON
+    // Copy JSON Button
     document.getElementById('copyJsonBtn').addEventListener('click', () => {
       if (!currentRawData) return;
       navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
