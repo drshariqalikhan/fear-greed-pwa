@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed Index | Live Market Sentiment</title>
-  <meta name="description" content="Single-page PWA dashboard for the CNN Fear & Greed Index">
+  <meta name="description" content="Single-page PWA dashboard showing raw metrics and sentiment scores for CNN Fear & Greed.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -44,6 +44,11 @@
     .indicator-card:hover {
       border-color: #3b82f6;
       transform: translateY(-2px);
+    }
+    .raw-metric-box {
+      background: rgba(15, 23, 42, 0.7);
+      border: 1px dashed #334155;
+      border-radius: 6px;
     }
     .pre-json {
       max-height: 480px;
@@ -102,7 +107,7 @@
         <div class="tabs is-toggle is-small is-toggle-rounded">
           <ul>
             <li class="is-active" data-tab="tab-overview"><a>Overview (<code>/get</code>)</a></li>
-            <li data-tab="tab-indicators"><a>7 Indicators</a></li>
+            <li data-tab="tab-indicators"><a>7 Indicators (Raw &amp; Score)</a></li>
             <li data-tab="tab-history"><a>History (<code>/history</code>)</a></li>
             <li data-tab="tab-raw"><a>Raw CNN (<code>/raw</code>)</a></li>
           </ul>
@@ -175,7 +180,7 @@
             <div class="box has-background-dark py-3 px-4 mt-4">
               <h3 class="is-size-7 has-text-weight-bold has-text-grey-light uppercase">Indicator Insight</h3>
               <p class="is-size-7 has-text-grey mt-1">
-                The Fear &amp; Greed index gauges whether stock markets are fairly priced. Extreme fear suggests stocks may be oversold, while extreme greed indicates potential overheating.
+                The Fear &amp; Greed index compiles 7 distinct market signals to gauge whether stocks are undervalued (extreme fear) or overbought (extreme greed).
               </p>
             </div>
           </div>
@@ -183,11 +188,11 @@
       </div>
     </section>
 
-    <!-- TAB 2: 7 INDICATORS -->
+    <!-- TAB 2: 7 INDICATORS (RAW + SCORE) -->
     <section id="tab-indicators" class="tab-content is-hidden">
       <div class="mb-4">
         <h2 class="title is-5 mb-1">The 7 Underlying Market Indicators</h2>
-        <p class="subtitle is-7 has-text-grey">From <code>fear_greed.get()['indicators']</code></p>
+        <p class="subtitle is-7 has-text-grey">Featuring live <strong>Raw Financial Values</strong> alongside normalized 0–100 Sentiment Scores.</p>
       </div>
       <div id="indicatorsGrid" class="columns is-multiline">
         <div class="column is-12 has-text-centered has-text-grey py-6">Loading indicators...</div>
@@ -258,10 +263,10 @@
   <!-- UNIFIED APP LOGIC + INLINE SERVICE WORKER -->
   <script>
     /* ==========================================================================
-       1. INLINE SERVICE WORKER REGISTRATION (Single-File PWA Engine)
+       1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v1';
+      const CACHE_NAME = 'fear-greed-singlefile-v2';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -285,12 +290,10 @@
 
       self.addEventListener('fetch', (e) => {
         const url = new URL(e.request.url);
-        // Do not cache backend API requests
         if (url.pathname.startsWith('/api/')) {
           e.respondWith(fetch(e.request));
           return;
         }
-        // Cache-first / stale-while-revalidate for assets
         e.respondWith(
           caches.match(e.request).then(cached => {
             const networkFetch = fetch(e.request).then(response => {
@@ -314,17 +317,16 @@
           navigator.serviceWorker.register(swUrl)
             .then(reg => console.log('Inline ServiceWorker Registered:', reg.scope))
             .catch(err => {
-              // Some browsers disallow blob: origins for Service Workers; fallback to /sw.js if available
               navigator.serviceWorker.register('/sw.js').catch(() => {});
             });
         } catch (e) {
-          console.warn('Service worker registration bypassed:', e);
+          console.warn('Service worker fallback:', e);
         }
       });
     }
 
     /* ==========================================================================
-       2. APPLICATION LOGIC & VISUALIZATION (Bulma + Vanilla JS)
+       2. DATA PARSING & EXTRACTION OF RAW MARKET VALUES
        ========================================================================== */
     const RATING_COLORS = {
       'extreme fear': '#f14668',
@@ -332,16 +334,6 @@
       'neutral': '#ffeaa7',
       'greed': '#2ed573',
       'extreme greed': '#10ac84'
-    };
-
-    const INDICATOR_DESCRIPTIONS = {
-      market_momentum_sp500: "S&P 500 relative to its 125-day moving average.",
-      stock_price_strength: "Number of stocks hitting 52-week highs vs 52-week lows.",
-      stock_price_breadth: "Trading volume in advancing vs declining stocks (McClellan).",
-      put_call_options: "Put options vs call options trading volume ratio.",
-      market_volatility_vix: "CBOE Volatility Index (VIX) relative to its 50-day average.",
-      junk_bond_demand: "Yield spread between junk bonds and safer investment-grade debt.",
-      safe_haven_demand: "Difference in 20-day returns for stocks versus safe Treasury bonds."
     };
 
     let currentRawData = null;
@@ -367,23 +359,200 @@
       return 'extreme greed';
     }
 
-    // Tab Navigation
-    document.querySelectorAll('.tabs li').forEach(tab => {
-      tab.addEventListener('click', () => {
-        document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
-        tab.classList.add('is-active');
+    function getLatestDataPoint(indicatorObj) {
+      if (!indicatorObj || !indicatorObj.data || !indicatorObj.data.length) return null;
+      return indicatorObj.data[indicatorObj.data.length - 1];
+    }
 
-        const target = tab.getAttribute('data-tab');
-        document.querySelectorAll('.tab-content').forEach(c => {
-          c.classList.toggle('is-hidden', c.id !== target);
-        });
+    // Extracts both normalized sub-scores AND raw values from CNN graphdata
+    function extractDetailedIndicators(raw) {
+      if (!raw) return [];
 
-        if (target === 'tab-history') {
-          drawHistoryChart(currentHistoryData);
-        }
+      const list = [];
+
+      // 1. Market Momentum (S&P 500 vs 125-Day MA)
+      const sp500 = raw.market_momentum_sp500;
+      const sp125 = raw.market_momentum_sp125;
+      const sp500Pt = getLatestDataPoint(sp500);
+      const sp125Pt = getLatestDataPoint(sp125);
+
+      let momentumRaw = "N/A";
+      let momentumDetail = "";
+      if (sp500Pt && sp125Pt) {
+        const diffPct = ((sp500Pt.y - sp125Pt.y) / sp125Pt.y) * 100;
+        const sign = diffPct >= 0 ? "+" : "";
+        momentumRaw = `${sp500Pt.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} pts`;
+        momentumDetail = `125-Day MA: ${sp125Pt.y.toLocaleString(undefined, {minimumFractionDigits: 2, maximumFractionDigits: 2})} (${sign}${diffPct.toFixed(2)}%)`;
+      } else if (sp500Pt) {
+        momentumRaw = `${sp500Pt.y.toFixed(2)} pts`;
+      }
+
+      list.push({
+        name: "Market Momentum",
+        score: sp500?.score,
+        rating: sp500?.rating,
+        rawValue: momentumRaw,
+        rawDetail: momentumDetail,
+        unit: "S&P 500 Price vs 125-day Moving Average",
+        desc: "Tracks the S&P 500 versus its 125-day moving average. Trading consistently above this average signals positive momentum."
       });
-    });
 
+      // 2. Stock Price Strength (52-week Highs vs Lows)
+      const strength = raw.stock_price_strength;
+      const strengthPt = getLatestDataPoint(strength);
+      list.push({
+        name: "Stock Price Strength",
+        score: strength?.score,
+        rating: strength?.rating,
+        rawValue: strengthPt ? `${strengthPt.y.toFixed(2)}%` : "N/A",
+        rawDetail: "Net 52-Week Highs vs Lows Ratio",
+        unit: "% of total NYSE listed stocks",
+        desc: "The percentage of stocks hitting new 52-week highs minus those sinking to new 52-week lows."
+      });
+
+      // 3. Stock Price Breadth (McClellan Summation Index)
+      const breadth = raw.stock_price_breadth;
+      const breadthPt = getLatestDataPoint(breadth);
+      list.push({
+        name: "Stock Price Breadth",
+        score: breadth?.score,
+        rating: breadth?.rating,
+        rawValue: breadthPt ? `${breadthPt.y.toFixed(2)}` : "N/A",
+        rawDetail: "McClellan Volume Summation Index",
+        unit: "Cumulative Volume Difference",
+        desc: "Measures advancing volume relative to declining volume on the NYSE over rolling periods."
+      });
+
+      // 4. Put and Call Options (CBOE 5-Day Ratio)
+      const putCall = raw.put_call_options;
+      const putCallPt = getLatestDataPoint(putCall);
+      list.push({
+        name: "Put and Call Options",
+        score: putCall?.score,
+        rating: putCall?.rating,
+        rawValue: putCallPt ? `${putCallPt.y.toFixed(2)}` : "N/A",
+        rawDetail: "CBOE 5-Day Put/Call Volume Ratio",
+        unit: "Ratio of Put Volume / Call Volume",
+        desc: "Tracks hedging sentiment. Under 0.8 represents bullish call buying; above 1.0 represents fearful put buying."
+      });
+
+      // 5. Market Volatility (VIX vs 50-Day MA)
+      const vix = raw.market_volatility_vix;
+      const vix50 = raw.market_volatility_vix_50;
+      const vixPt = getLatestDataPoint(vix);
+      const vix50Pt = getLatestDataPoint(vix50);
+
+      let vixRaw = "N/A";
+      let vixDetail = "CBOE Volatility Index (VIX)";
+      if (vixPt && vix50Pt) {
+        const diff = vixPt.y - vix50Pt.y;
+        const sign = diff >= 0 ? "+" : "";
+        vixRaw = `${vixPt.y.toFixed(2)}`;
+        vixDetail = `50-Day MA: ${vix50Pt.y.toFixed(2)} (${sign}${diff.toFixed(2)})`;
+      } else if (vixPt) {
+        vixRaw = `${vixPt.y.toFixed(2)}`;
+      }
+
+      list.push({
+        name: "Market Volatility (VIX)",
+        score: vix?.score,
+        rating: vix?.rating,
+        rawValue: vixRaw,
+        rawDetail: vixDetail,
+        unit: "30-Day Implied Volatility Index",
+        desc: "Measures 30-day forward expected market volatility. When VIX is below its 50-day average, complacency/greed reigns."
+      });
+
+      // 6. Junk Bond Demand (Yield Spread)
+      const junk = raw.junk_bond_demand;
+      const junkPt = getLatestDataPoint(junk);
+      list.push({
+        name: "Junk Bond Demand",
+        score: junk?.score,
+        rating: junk?.rating,
+        rawValue: junkPt ? `${junkPt.y.toFixed(2)}%` : "N/A",
+        rawDetail: "Credit Yield Spread",
+        unit: "Spread between Junk & Investment-Grade Bonds",
+        desc: "Yield premium demanded by investors for high-yield junk debt over safer investment-grade corporate bonds."
+      });
+
+      // 7. Safe Haven Demand (Stocks vs Treasuries)
+      const safe = raw.safe_haven_demand;
+      const safePt = getLatestDataPoint(safe);
+      let safeRaw = "N/A";
+      if (safePt) {
+        const sign = safePt.y >= 0 ? "+" : "";
+        safeRaw = `${sign}${safePt.y.toFixed(2)}%`;
+      }
+
+      list.push({
+        name: "Safe Haven Demand",
+        score: safe?.score,
+        rating: safe?.rating,
+        rawValue: safeRaw,
+        rawDetail: "20-Day Trailing Return Spread",
+        unit: "Stock Returns minus Treasury Bond Returns",
+        desc: "Difference in performance between risk-on equities and safe-haven U.S. government bonds over the past 20 trading days."
+      });
+
+      return list;
+    }
+
+    // Render Indicator Cards with Raw Value + Score
+    function renderIndicatorsWithRaw(rawPayload) {
+      const grid = document.getElementById('indicatorsGrid');
+      if (!rawPayload) return;
+
+      const indicators = extractDetailedIndicators(rawPayload);
+
+      grid.innerHTML = indicators.map(item => {
+        const score = Number(item.score || 0).toFixed(1);
+        const rating = item.rating || deriveRating(score);
+        const color = getRatingColor(rating);
+
+        return `
+          <div class="column is-6-tablet is-4-desktop">
+            <div class="indicator-card p-4 h-100 is-flex is-flex-direction-column is-justify-content-space-between">
+              <div>
+                <!-- Header: Name & Rating -->
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
+                  <span class="has-text-weight-bold is-size-6">${item.name}</span>
+                  <span class="tag is-small" style="background-color: ${color}; color: #fff;">${formatRating(rating)}</span>
+                </div>
+
+                <!-- Highlight Box: Raw Market Value -->
+                <div class="raw-metric-box p-3 my-2">
+                  <div class="is-size-7 has-text-grey uppercase has-text-weight-semibold">Raw Market Value</div>
+                  <div class="is-size-4 has-text-weight-bold has-text-info-light">
+                    ${item.rawValue}
+                  </div>
+                  <div class="is-size-7 has-text-grey-light mt-1">
+                    ${item.rawDetail}
+                  </div>
+                  <div class="is-size-7 has-text-grey mt-1">
+                    <em>Unit: ${item.unit}</em>
+                  </div>
+                </div>
+
+                <!-- Sub-score Out of 100 -->
+                <div class="mt-3 is-flex is-justify-content-space-between is-align-items-baseline">
+                  <span class="is-size-7 has-text-grey">Normalized Sentiment:</span>
+                  <span class="is-size-6 has-text-weight-bold">${score} <span class="is-size-7 has-text-grey">/100</span></span>
+                </div>
+                <progress class="progress is-small mt-1 mb-2" value="${score}" max="100" style="accent-color: ${color};"></progress>
+              </div>
+
+              <!-- Explanation Footer -->
+              <p class="is-size-7 has-text-grey mt-2 border-top pt-2">${item.desc}</p>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    /* ==========================================================================
+       3. GAUGE, SNAPSHOTS, HISTORY & API LOGIC
+       ========================================================================== */
     // Speedometer Needle Animation
     function updateGauge(score, rating) {
       const needle = document.getElementById('needle');
@@ -429,35 +598,64 @@
       }).join('');
     }
 
-    // 7 Indicators Rendering
-    function renderIndicators(indicators) {
-      const grid = document.getElementById('indicatorsGrid');
-      if (!indicators) return;
+    // Draw History Canvas Chart
+    function drawHistoryChart(data) {
+      const canvas = document.getElementById('historyChart');
+      if (!canvas || !data || data.length === 0) return;
 
-      grid.innerHTML = Object.entries(indicators).map(([key, item]) => {
-        const score = Number(item.score || 0).toFixed(1);
-        const rating = item.rating || deriveRating(score);
-        const color = getRatingColor(rating);
-        const prettyName = key.replace(/_/g, ' ').toUpperCase();
-        const desc = INDICATOR_DESCRIPTIONS[key] || 'Underlying market component indicator.';
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
 
-        return `
-          <div class="column is-6-tablet is-4-desktop">
-            <div class="indicator-card p-4 h-100">
-              <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-                <span class="has-text-weight-bold is-size-6">${prettyName}</span>
-                <span class="tag is-small" style="background-color: ${color}; color: #fff;">${formatRating(rating)}</span>
-              </div>
-              <div class="is-size-4 has-text-weight-semibold mb-2">${score} <span class="is-size-7 has-text-grey">/100</span></div>
-              <progress class="progress is-small" value="${score}" max="100" style="accent-color: ${color};"></progress>
-              <p class="is-size-7 has-text-grey mt-2">${desc}</p>
-            </div>
-          </div>
-        `;
-      }).join('');
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const pad = 35;
+
+      ctx.clearRect(0, 0, w, h);
+
+      // Background Zones
+      const zones = [
+        { from: 0, to: 25, color: 'rgba(241, 70, 104, 0.08)' },
+        { from: 25, to: 45, color: 'rgba(255, 159, 67, 0.08)' },
+        { from: 45, to: 55, color: 'rgba(255, 234, 167, 0.05)' },
+        { from: 55, to: 75, color: 'rgba(46, 213, 115, 0.08)' },
+        { from: 75, to: 100, color: 'rgba(16, 172, 132, 0.08)' }
+      ];
+
+      zones.forEach(z => {
+        const yTop = h - pad - (z.to / 100) * (h - pad * 2);
+        const yBottom = h - pad - (z.from / 100) * (h - pad * 2);
+        ctx.fillStyle = z.color;
+        ctx.fillRect(pad, yTop, w - pad * 2, yBottom - yTop);
+      });
+
+      const pts = [...data].reverse();
+      const stepX = (w - pad * 2) / (pts.length - 1 || 1);
+
+      ctx.beginPath();
+      pts.forEach((p, i) => {
+        const x = pad + i * stepX;
+        const y = h - pad - (Number(p.score) / 100) * (h - pad * 2);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      ctx.fillStyle = '#64748b';
+      ctx.font = '10px monospace';
+      [0, 25, 50, 75, 100].forEach(val => {
+        const y = h - pad - (val / 100) * (h - pad * 2);
+        ctx.fillText(val, 8, y + 3);
+      });
     }
 
-    // Daily History Timeline
+    // Render Daily History Table
     function renderHistoryTable(data) {
       const tbody = document.getElementById('historyTableBody');
       if (!data || data.length === 0) {
@@ -482,66 +680,7 @@
       }).join('');
     }
 
-    // Lightweight Canvas Trend Chart
-    function drawHistoryChart(data) {
-      const canvas = document.getElementById('historyChart');
-      if (!canvas || !data || data.length === 0) return;
-
-      const ctx = canvas.getContext('2d');
-      const dpr = window.devicePixelRatio || 1;
-      const rect = canvas.parentElement.getBoundingClientRect();
-
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-
-      const w = rect.width;
-      const h = rect.height;
-      const pad = 35;
-
-      ctx.clearRect(0, 0, w, h);
-
-      // Sentiment Background Zones
-      const zones = [
-        { from: 0, to: 25, color: 'rgba(241, 70, 104, 0.08)' },
-        { from: 25, to: 45, color: 'rgba(255, 159, 67, 0.08)' },
-        { from: 45, to: 55, color: 'rgba(255, 234, 167, 0.05)' },
-        { from: 55, to: 75, color: 'rgba(46, 213, 115, 0.08)' },
-        { from: 75, to: 100, color: 'rgba(16, 172, 132, 0.08)' }
-      ];
-
-      zones.forEach(z => {
-        const yTop = h - pad - (z.to / 100) * (h - pad * 2);
-        const yBottom = h - pad - (z.from / 100) * (h - pad * 2);
-        ctx.fillStyle = z.color;
-        ctx.fillRect(pad, yTop, w - pad * 2, yBottom - yTop);
-      });
-
-      // Data Curve
-      const pts = [...data].reverse();
-      const stepX = (w - pad * 2) / (pts.length - 1 || 1);
-
-      ctx.beginPath();
-      pts.forEach((p, i) => {
-        const x = pad + i * stepX;
-        const y = h - pad - (Number(p.score) / 100) * (h - pad * 2);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.strokeStyle = '#38bdf8';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
-
-      // Axis labels
-      ctx.fillStyle = '#64748b';
-      ctx.font = '10px monospace';
-      [0, 25, 50, 75, 100].forEach(val => {
-        const y = h - pad - (val / 100) * (h - pad * 2);
-        ctx.fillText(val, 8, y + 3);
-      });
-    }
-
-    // Fetch from all API Endpoints
+    // Fetch All API Endpoints
     async function fetchAllData() {
       const statusPill = document.getElementById('statusPill');
       const lastUpdatedText = document.getElementById('lastUpdatedText');
@@ -550,28 +689,28 @@
         statusPill.className = 'tag is-warning is-light';
         statusPill.textContent = 'Updating...';
 
-        // 1. fear_greed.get()
+        // 1. Full Snapshot (/api/get)
         const getRes = await fetch('/api/get');
         if (!getRes.ok) throw new Error(`HTTP ${getRes.status}`);
         const getData = await getRes.json();
 
         updateGauge(getData.score, getData.rating);
         renderSnapshots(getData.history);
-        renderIndicators(getData.indicators);
 
-        // 2. fear_greed.get_history()
+        // 2. Raw CNN Payload (/api/raw) for Raw Indicator Values
+        const rawRes = await fetch('/api/raw');
+        if (rawRes.ok) {
+          currentRawData = await rawRes.json();
+          renderIndicatorsWithRaw(currentRawData);
+          document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
+        }
+
+        // 3. Daily History Series (/api/history?last=30d)
         const histRes = await fetch('/api/history?last=30d');
         if (histRes.ok) {
           currentHistoryData = await histRes.json();
           renderHistoryTable(currentHistoryData);
           drawHistoryChart(currentHistoryData);
-        }
-
-        // 3. fear_greed.fetch()
-        const rawRes = await fetch('/api/raw');
-        if (rawRes.ok) {
-          currentRawData = await rawRes.json();
-          document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
         statusPill.className = 'tag is-success is-light';
@@ -585,7 +724,24 @@
       }
     }
 
-    // Period Selection for History
+    // Tabs switching
+    document.querySelectorAll('.tabs li').forEach(tab => {
+      tab.addEventListener('click', () => {
+        document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
+        tab.classList.add('is-active');
+
+        const target = tab.getAttribute('data-tab');
+        document.querySelectorAll('.tab-content').forEach(c => {
+          c.classList.toggle('is-hidden', c.id !== target);
+        });
+
+        if (target === 'tab-history') {
+          drawHistoryChart(currentHistoryData);
+        }
+      });
+    });
+
+    // History Period Switcher
     document.querySelectorAll('#historyPeriodSelector button').forEach(btn => {
       btn.addEventListener('click', async () => {
         document.querySelectorAll('#historyPeriodSelector button').forEach(b => b.classList.remove('is-active', 'is-info'));
@@ -605,7 +761,7 @@
       });
     });
 
-    // Copy Raw JSON
+    // Copy JSON Button
     document.getElementById('copyJsonBtn').addEventListener('click', () => {
       if (!currentRawData) return;
       navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
@@ -616,7 +772,7 @@
 
     document.getElementById('refreshBtn').addEventListener('click', fetchAllData);
 
-    // PWA Install Prompt Handler
+    // PWA Install prompt
     let deferredPrompt;
     window.addEventListener('beforeinstallprompt', (e) => {
       e.preventDefault();
@@ -632,7 +788,7 @@
       });
     });
 
-    // Initial load
+    // Initial Load
     fetchAllData();
   </script>
 </body>
