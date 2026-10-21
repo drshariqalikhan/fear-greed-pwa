@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>CNN Fear &amp; Greed Index | Live Market Sentiment</title>
-  <meta name="description" content="Single-page PWA dashboard showing raw metrics and sentiment scores for CNN Fear & Greed.">
+  <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
+  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed and SPY 1-Month Fibonacci Retracement Levels.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
-  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22CNN%20Fear%20%26%20Greed%20Sentiment%22%2C%22short_name%22%3A%22FearGreed%22%2C%22description%22%3A%22Live%20Stock%20Market%20Fear%20%26%20Greed%20Tracker%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0f19%22%2C%22theme_color%22%3A%22%2312161a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ctext%20y%3D'.9em'%20font-size%3D'90'%3E%F0%9F%93%8A%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
+  <link rel="manifest" href="data:application/manifest+json;charset=utf-8,%7B%22name%22%3A%22Market%20Sentiment%20%26%20Fibonacci%22%2C%22short_name%22%3A%22MarketPWA%22%2C%22description%22%3A%22Fear%20%26%20Greed%20Index%20with%20SPY%20Fibonacci%20Retracement%22%2C%22start_url%22%3A%22%2F%22%2C%22display%22%3A%22standalone%22%2C%22background_color%22%3A%22%230b0f19%22%2C%22theme_color%22%3A%22%2312161a%22%2C%22icons%22%3A%5B%7B%22src%22%3A%22data%3Aimage%2Fsvg%2Bxml%2C%3Csvg%20xmlns%3D'http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg'%20viewBox%3D'0%200%20100%20100'%3E%3Ctext%20y%3D'.9em'%20font-size%3D'90'%3E%F0%9F%93%8A%3C%2Ftext%3E%3C%2Fsvg%3E%22%2C%22sizes%22%3A%22192x192%20512x512%22%2C%22type%22%3A%22image%2Fsvg%2Bxml%22%2C%22purpose%22%3A%22any%20maskable%22%7D%5D%7D">
 
   <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📊</text></svg>">
 
@@ -35,13 +35,13 @@
       text-transform: uppercase;
       font-weight: 700;
     }
-    .indicator-card {
+    .indicator-card, .metric-card {
       background: #151b28;
       border: 1px solid #242e42;
       border-radius: 8px;
       transition: transform 0.2s ease, border-color 0.2s ease;
     }
-    .indicator-card:hover {
+    .indicator-card:hover, .metric-card:hover {
       border-color: #3b82f6;
       transform: translateY(-2px);
     }
@@ -63,6 +63,10 @@
       height: 6px;
       border-radius: 3px;
     }
+    .fib-badge {
+      font-family: monospace;
+      font-weight: bold;
+    }
   </style>
 </head>
 <body>
@@ -71,7 +75,7 @@
     <div class="container is-fluid">
       <div class="navbar-brand">
         <span class="navbar-item has-text-weight-bold is-size-5">
-          📈 Market Sentiment PWA
+          📈 Market Sentiment &amp; Technicals PWA
         </span>
       </div>
       <div class="navbar-end">
@@ -108,6 +112,7 @@
           <ul>
             <li class="is-active" data-tab="tab-overview"><a>Overview (<code>/get</code>)</a></li>
             <li data-tab="tab-indicators"><a>7 Indicators (Raw &amp; Score)</a></li>
+            <li data-tab="tab-fibonacci"><a>📐 SPY Fibonacci (1M)</a></li>
             <li data-tab="tab-history"><a>History (<code>/history</code>)</a></li>
             <li data-tab="tab-raw"><a>Raw CNN (<code>/raw</code>)</a></li>
           </ul>
@@ -188,7 +193,7 @@
       </div>
     </section>
 
-    <!-- TAB 2: 7 INDICATORS (RAW + SCORE) -->
+    <!-- TAB 2: 7 INDICATORS (RAW & SCORE) -->
     <section id="tab-indicators" class="tab-content is-hidden">
       <div class="mb-4">
         <h2 class="title is-5 mb-1">The 7 Underlying Market Indicators</h2>
@@ -199,7 +204,76 @@
       </div>
     </section>
 
-    <!-- TAB 3: DAILY HISTORY -->
+    <!-- TAB 3: SPY FIBONACCI RETRACEMENT (1 MONTH) -->
+    <section id="tab-fibonacci" class="tab-content is-hidden">
+      <div class="mb-4">
+        <h2 class="title is-5 mb-1">📐 SPY 1-Month Fibonacci Retracement Levels</h2>
+        <p class="subtitle is-7 has-text-grey">Calculated from the <strong>highest close</strong> to <strong>lowest close</strong> over the past 30 trading days.</p>
+      </div>
+
+      <!-- Metric Highlights Cards -->
+      <div class="columns is-multiline mb-2">
+        <div class="column is-6-tablet is-3-desktop">
+          <div class="metric-card p-4">
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">Current SPY Close</span>
+            <div class="is-size-3 has-text-weight-bold has-text-info mt-1" id="spyCurrentClose">$--</div>
+            <span class="is-size-7 has-text-grey-light" id="spyCurrentStatus">Calculating position...</span>
+          </div>
+        </div>
+        <div class="column is-6-tablet is-3-desktop">
+          <div class="metric-card p-4">
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Highest Close (0.0%)</span>
+            <div class="is-size-3 has-text-weight-bold has-text-danger-light mt-1" id="spyHighClose">$--</div>
+            <span class="is-size-7 has-text-grey" id="spyHighDate">Date: --</span>
+          </div>
+        </div>
+        <div class="column is-6-tablet is-3-desktop">
+          <div class="metric-card p-4">
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Lowest Close (100.0%)</span>
+            <div class="is-size-3 has-text-weight-bold has-text-success mt-1" id="spyLowClose">$--</div>
+            <span class="is-size-7 has-text-grey" id="spyLowDate">Date: --</span>
+          </div>
+        </div>
+        <div class="column is-6-tablet is-3-desktop">
+          <div class="metric-card p-4">
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1-Month Spread</span>
+            <div class="is-size-3 has-text-weight-bold has-text-warning mt-1" id="spyRange">$--</div>
+            <span class="is-size-7 has-text-grey" id="spyRangePct">Range: --%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Fibonacci Visual Chart -->
+      <div class="card has-background-darker p-4 mb-4">
+        <h3 class="is-size-6 has-text-weight-bold mb-2">SPY Daily Closes with Fibonacci Grid</h3>
+        <div style="position: relative; width: 100%; height: 280px;">
+          <canvas id="fibChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Fibonacci Levels Breakdown Table -->
+      <div class="card has-background-darker p-4">
+        <h3 class="is-size-6 has-text-weight-bold mb-3">Calculated Fibonacci Levels &amp; Price Targets</h3>
+        <div class="table-container">
+          <table class="table is-fullwidth is-striped has-background-transparent">
+            <thead>
+              <tr>
+                <th>Level</th>
+                <th>Ratio</th>
+                <th>Price Target</th>
+                <th>Distance from Current</th>
+                <th>Technical Role</th>
+              </tr>
+            </thead>
+            <tbody id="fibTableBody">
+              <tr><td colspan="5" class="has-text-grey">Calculating Fibonacci levels...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: DAILY HISTORY -->
     <section id="tab-history" class="tab-content is-hidden">
       <div class="level mb-3">
         <div class="level-left">
@@ -241,7 +315,7 @@
       </div>
     </section>
 
-    <!-- TAB 4: RAW CNN API -->
+    <!-- TAB 5: RAW CNN API -->
     <section id="tab-raw" class="tab-content is-hidden">
       <div class="level mb-3">
         <div class="level-left">
@@ -263,10 +337,10 @@
   <!-- UNIFIED APP LOGIC + INLINE SERVICE WORKER -->
   <script>
     /* ==========================================================================
-       1. INLINE SERVICE WORKER (Single-File PWA Engine)
+       1. INLINE SERVICE WORKER REGISTRATION (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v2';
+      const CACHE_NAME = 'fear-greed-singlefile-v3';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -326,7 +400,7 @@
     }
 
     /* ==========================================================================
-       2. DATA PARSING & EXTRACTION OF RAW MARKET VALUES
+       2. DATA HELPERS & RAW METRIC PARSER
        ========================================================================== */
     const RATING_COLORS = {
       'extreme fear': '#f14668',
@@ -338,6 +412,7 @@
 
     let currentRawData = null;
     let currentHistoryData = [];
+    let currentFibData = null;
 
     function formatRating(rating) {
       if (!rating) return 'UNKNOWN';
@@ -364,18 +439,15 @@
       return indicatorObj.data[indicatorObj.data.length - 1];
     }
 
-    // Extracts both normalized sub-scores AND raw values from CNN graphdata
     function extractDetailedIndicators(raw) {
       if (!raw) return [];
-
       const list = [];
 
-      // 1. Market Momentum (S&P 500 vs 125-Day MA)
+      // 1. Market Momentum
       const sp500 = raw.market_momentum_sp500;
       const sp125 = raw.market_momentum_sp125;
       const sp500Pt = getLatestDataPoint(sp500);
       const sp125Pt = getLatestDataPoint(sp125);
-
       let momentumRaw = "N/A";
       let momentumDetail = "";
       if (sp500Pt && sp125Pt) {
@@ -386,18 +458,17 @@
       } else if (sp500Pt) {
         momentumRaw = `${sp500Pt.y.toFixed(2)} pts`;
       }
-
       list.push({
         name: "Market Momentum",
         score: sp500?.score,
         rating: sp500?.rating,
         rawValue: momentumRaw,
         rawDetail: momentumDetail,
-        unit: "S&P 500 Price vs 125-day Moving Average",
-        desc: "Tracks the S&P 500 versus its 125-day moving average. Trading consistently above this average signals positive momentum."
+        unit: "S&P 500 Index Level vs 125-Day Moving Average",
+        desc: "Tracks S&P 500 distance above or below its 125-day moving average. Trading above indicates positive momentum."
       });
 
-      // 2. Stock Price Strength (52-week Highs vs Lows)
+      // 2. Stock Price Strength
       const strength = raw.stock_price_strength;
       const strengthPt = getLatestDataPoint(strength);
       list.push({
@@ -410,7 +481,7 @@
         desc: "The percentage of stocks hitting new 52-week highs minus those sinking to new 52-week lows."
       });
 
-      // 3. Stock Price Breadth (McClellan Summation Index)
+      // 3. Stock Price Breadth
       const breadth = raw.stock_price_breadth;
       const breadthPt = getLatestDataPoint(breadth);
       list.push({
@@ -423,7 +494,7 @@
         desc: "Measures advancing volume relative to declining volume on the NYSE over rolling periods."
       });
 
-      // 4. Put and Call Options (CBOE 5-Day Ratio)
+      // 4. Put and Call Options
       const putCall = raw.put_call_options;
       const putCallPt = getLatestDataPoint(putCall);
       list.push({
@@ -433,15 +504,14 @@
         rawValue: putCallPt ? `${putCallPt.y.toFixed(2)}` : "N/A",
         rawDetail: "CBOE 5-Day Put/Call Volume Ratio",
         unit: "Ratio of Put Volume / Call Volume",
-        desc: "Tracks hedging sentiment. Under 0.8 represents bullish call buying; above 1.0 represents fearful put buying."
+        desc: "Under 0.8 represents bullish call buying; above 1.0 represents fearful put buying."
       });
 
-      // 5. Market Volatility (VIX vs 50-Day MA)
+      // 5. Market Volatility (VIX)
       const vix = raw.market_volatility_vix;
       const vix50 = raw.market_volatility_vix_50;
       const vixPt = getLatestDataPoint(vix);
       const vix50Pt = getLatestDataPoint(vix50);
-
       let vixRaw = "N/A";
       let vixDetail = "CBOE Volatility Index (VIX)";
       if (vixPt && vix50Pt) {
@@ -452,7 +522,6 @@
       } else if (vixPt) {
         vixRaw = `${vixPt.y.toFixed(2)}`;
       }
-
       list.push({
         name: "Market Volatility (VIX)",
         score: vix?.score,
@@ -460,10 +529,10 @@
         rawValue: vixRaw,
         rawDetail: vixDetail,
         unit: "30-Day Implied Volatility Index",
-        desc: "Measures 30-day forward expected market volatility. When VIX is below its 50-day average, complacency/greed reigns."
+        desc: "Expected 30-day market volatility. VIX trading below its 50-day average signals market complacency."
       });
 
-      // 6. Junk Bond Demand (Yield Spread)
+      // 6. Junk Bond Demand
       const junk = raw.junk_bond_demand;
       const junkPt = getLatestDataPoint(junk);
       list.push({
@@ -476,7 +545,7 @@
         desc: "Yield premium demanded by investors for high-yield junk debt over safer investment-grade corporate bonds."
       });
 
-      // 7. Safe Haven Demand (Stocks vs Treasuries)
+      // 7. Safe Haven Demand
       const safe = raw.safe_haven_demand;
       const safePt = getLatestDataPoint(safe);
       let safeRaw = "N/A";
@@ -484,7 +553,6 @@
         const sign = safePt.y >= 0 ? "+" : "";
         safeRaw = `${sign}${safePt.y.toFixed(2)}%`;
       }
-
       list.push({
         name: "Safe Haven Demand",
         score: safe?.score,
@@ -492,19 +560,18 @@
         rawValue: safeRaw,
         rawDetail: "20-Day Trailing Return Spread",
         unit: "Stock Returns minus Treasury Bond Returns",
-        desc: "Difference in performance between risk-on equities and safe-haven U.S. government bonds over the past 20 trading days."
+        desc: "Difference in performance between stocks and safe-haven U.S. government bonds over the past 20 trading days."
       });
 
       return list;
     }
 
-    // Render Indicator Cards with Raw Value + Score
+    // Render 7 Indicators Cards
     function renderIndicatorsWithRaw(rawPayload) {
       const grid = document.getElementById('indicatorsGrid');
       if (!rawPayload) return;
 
       const indicators = extractDetailedIndicators(rawPayload);
-
       grid.innerHTML = indicators.map(item => {
         const score = Number(item.score || 0).toFixed(1);
         const rating = item.rating || deriveRating(score);
@@ -514,35 +581,22 @@
           <div class="column is-6-tablet is-4-desktop">
             <div class="indicator-card p-4 h-100 is-flex is-flex-direction-column is-justify-content-space-between">
               <div>
-                <!-- Header: Name & Rating -->
                 <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
                   <span class="has-text-weight-bold is-size-6">${item.name}</span>
                   <span class="tag is-small" style="background-color: ${color}; color: #fff;">${formatRating(rating)}</span>
                 </div>
-
-                <!-- Highlight Box: Raw Market Value -->
                 <div class="raw-metric-box p-3 my-2">
                   <div class="is-size-7 has-text-grey uppercase has-text-weight-semibold">Raw Market Value</div>
-                  <div class="is-size-4 has-text-weight-bold has-text-info-light">
-                    ${item.rawValue}
-                  </div>
-                  <div class="is-size-7 has-text-grey-light mt-1">
-                    ${item.rawDetail}
-                  </div>
-                  <div class="is-size-7 has-text-grey mt-1">
-                    <em>Unit: ${item.unit}</em>
-                  </div>
+                  <div class="is-size-4 has-text-weight-bold has-text-info-light">${item.rawValue}</div>
+                  <div class="is-size-7 has-text-grey-light mt-1">${item.rawDetail}</div>
+                  <div class="is-size-7 has-text-grey mt-1"><em>Unit: ${item.unit}</em></div>
                 </div>
-
-                <!-- Sub-score Out of 100 -->
                 <div class="mt-3 is-flex is-justify-content-space-between is-align-items-baseline">
                   <span class="is-size-7 has-text-grey">Normalized Sentiment:</span>
                   <span class="is-size-6 has-text-weight-bold">${score} <span class="is-size-7 has-text-grey">/100</span></span>
                 </div>
                 <progress class="progress is-small mt-1 mb-2" value="${score}" max="100" style="accent-color: ${color};"></progress>
               </div>
-
-              <!-- Explanation Footer -->
               <p class="is-size-7 has-text-grey mt-2 border-top pt-2">${item.desc}</p>
             </div>
           </div>
@@ -551,9 +605,176 @@
     }
 
     /* ==========================================================================
-       3. GAUGE, SNAPSHOTS, HISTORY & API LOGIC
+       3. SPY FIBONACCI RETRACEMENT VISUALIZATION
        ========================================================================== */
-    // Speedometer Needle Animation
+    function renderFibonacciTab(data) {
+      if (!data) return;
+
+      const cur = Number(data.current_close);
+      const high = Number(data.highest_close);
+      const low = Number(data.lowest_close);
+      const range = Number(data.range);
+      const rangePct = ((range / low) * 100).toFixed(2);
+
+      document.getElementById('spyCurrentClose').textContent = `$${cur.toFixed(2)}`;
+      document.getElementById('spyHighClose').textContent = `$${high.toFixed(2)}`;
+      document.getElementById('spyHighDate').textContent = `Peak Date: ${data.highest_date}`;
+      document.getElementById('spyLowClose').textContent = `$${low.toFixed(2)}`;
+      document.getElementById('spyLowDate').textContent = `Trough Date: ${data.lowest_date}`;
+      document.getElementById('spyRange').textContent = `$${range.toFixed(2)}`;
+      document.getElementById('spyRangePct').textContent = `Monthly Swing: ${rangePct}%`;
+
+      // Status Tag
+      const statusSpan = document.getElementById('spyCurrentStatus');
+      if (cur >= high) {
+        statusSpan.innerHTML = `<span class="tag is-success is-light">Trading at or above 1M High</span>`;
+      } else if (cur <= low) {
+        statusSpan.innerHTML = `<span class="tag is-danger is-light">Trading at or below 1M Low</span>`;
+      } else {
+        const retrace = (((high - cur) / range) * 100).toFixed(1);
+        statusSpan.innerHTML = `<span class="tag is-info is-light">${retrace}% Retraced from Peak</span>`;
+      }
+
+      // Render Levels Table
+      const tbody = document.getElementById('fibTableBody');
+      tbody.innerHTML = data.levels.map(lvl => {
+        const p = Number(lvl.price);
+        const dist = cur - p;
+        const distPct = ((dist / p) * 100).toFixed(2);
+        const isCurrentZone = Math.abs(dist) < 1.0;
+        
+        let roleBadge = "";
+        if (isCurrentZone) {
+          roleBadge = `<span class="tag is-info is-light has-text-weight-bold">🎯 At Current Price</span>`;
+        } else if (p < cur) {
+          roleBadge = `<span class="tag is-success is-light">Support Level</span>`;
+        } else {
+          roleBadge = `<span class="tag is-danger is-light">Resistance Level</span>`;
+        }
+
+        const sign = dist >= 0 ? "+" : "";
+
+        return `
+          <tr style="${isCurrentZone ? 'background: rgba(56, 189, 248, 0.1);' : ''}">
+            <td class="has-text-weight-bold" style="color: ${lvl.color || '#fff'};">${lvl.label}</td>
+            <td><code class="fib-badge">${(lvl.ratio * 100).toFixed(1)}%</code></td>
+            <td class="is-size-6 has-text-weight-bold">$${p.toFixed(2)}</td>
+            <td><span class="${dist >= 0 ? 'has-text-success' : 'has-text-danger'}">${sign}$${dist.toFixed(2)} (${sign}${distPct}%)</span></td>
+            <td>${roleBadge}</td>
+          </tr>
+        `;
+      }).join('');
+
+      drawFibChart(data);
+    }
+
+    // Draw SPY 1-Month Canvas Chart with Fibonacci Gridlines
+    function drawFibChart(data) {
+      const canvas = document.getElementById('fibChart');
+      if (!canvas || !data || !data.history || data.history.length === 0) return;
+
+      const ctx = canvas.getContext('2d');
+      const dpr = window.devicePixelRatio || 1;
+      const rect = canvas.parentElement.getBoundingClientRect();
+
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      ctx.scale(dpr, dpr);
+
+      const w = rect.width;
+      const h = rect.height;
+      const padLeft = 70;
+      const padRight = 30;
+      const padTop = 20;
+      const padBottom = 30;
+
+      ctx.clearRect(0, 0, w, h);
+
+      const high = Number(data.highest_close);
+      const low = Number(data.lowest_close);
+      const cur = Number(data.current_close);
+      const chartRange = high - low || 1;
+
+      // Price to Y coordinate mapper
+      const getY = (price) => {
+        return padTop + (high - price) / chartRange * (h - padTop - padBottom);
+      };
+
+      // 1. Draw Fibonacci Horizontal Gridlines
+      data.levels.forEach(lvl => {
+        const y = getY(lvl.price);
+        ctx.beginPath();
+        ctx.setLineDash([4, 4]);
+        ctx.strokeStyle = lvl.color || '#64748b';
+        ctx.lineWidth = 1;
+        ctx.moveTo(padLeft, y);
+        ctx.lineTo(w - padRight, y);
+        ctx.stroke();
+
+        // Label on left
+        ctx.setLineDash([]);
+        ctx.fillStyle = lvl.color || '#cbd5e1';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'right';
+        ctx.fillText(`$${lvl.price.toFixed(2)} (${(lvl.ratio * 100).toFixed(0)}%)`, padLeft - 6, y + 3);
+      });
+
+      // 2. Draw Current Price Marker Line
+      const curY = getY(cur);
+      ctx.beginPath();
+      ctx.strokeStyle = '#38bdf8';
+      ctx.lineWidth = 1.5;
+      ctx.setLineDash([2, 2]);
+      ctx.moveTo(padLeft, curY);
+      ctx.lineTo(w - padRight, curY);
+      ctx.stroke();
+
+      ctx.setLineDash([]);
+      ctx.fillStyle = '#38bdf8';
+      ctx.font = 'bold 10px monospace';
+      ctx.textAlign = 'left';
+      ctx.fillText(`NOW: $${cur.toFixed(2)}`, w - padRight + 4, curY + 3);
+
+      // 3. Draw SPY Daily Close Price Line
+      const history = data.history;
+      const stepX = (w - padLeft - padRight) / (history.length - 1 || 1);
+
+      ctx.beginPath();
+      history.forEach((pt, i) => {
+        const x = padLeft + i * stepX;
+        const y = getY(pt.close);
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+      });
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 2.5;
+      ctx.stroke();
+
+      // Point dots
+      history.forEach((pt, i) => {
+        const x = padLeft + i * stepX;
+        const y = getY(pt.close);
+        ctx.beginPath();
+        ctx.arc(x, y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = pt.close >= low + chartRange / 2 ? '#4ade80' : '#f87171';
+        ctx.fill();
+      });
+
+      // X-Axis Date markers
+      ctx.fillStyle = '#64748b';
+      ctx.font = '9px monospace';
+      ctx.textAlign = 'center';
+      if (history.length > 0) {
+        ctx.fillText(history[0].date.slice(5), padLeft, h - 8);
+        const midIdx = Math.floor(history.length / 2);
+        ctx.fillText(history[midIdx].date.slice(5), padLeft + midIdx * stepX, h - 8);
+        ctx.fillText(history[history.length - 1].date.slice(5), w - padRight, h - 8);
+      }
+    }
+
+    /* ==========================================================================
+       4. GAUGE, SNAPSHOTS, HISTORY TIMELINE & MASTER FETCH
+       ========================================================================== */
     function updateGauge(score, rating) {
       const needle = document.getElementById('needle');
       const scoreVal = document.getElementById('scoreVal');
@@ -569,7 +790,6 @@
       badge.style.color = rating === 'neutral' ? '#1a202c' : '#ffffff';
     }
 
-    // Historical Snapshots
     function renderSnapshots(historyMap) {
       const tbody = document.getElementById('historySnapshotsBody');
       if (!historyMap) return;
@@ -598,7 +818,6 @@
       }).join('');
     }
 
-    // Draw History Canvas Chart
     function drawHistoryChart(data) {
       const canvas = document.getElementById('historyChart');
       if (!canvas || !data || data.length === 0) return;
@@ -617,7 +836,6 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      // Background Zones
       const zones = [
         { from: 0, to: 25, color: 'rgba(241, 70, 104, 0.08)' },
         { from: 25, to: 45, color: 'rgba(255, 159, 67, 0.08)' },
@@ -655,7 +873,6 @@
       });
     }
 
-    // Render Daily History Table
     function renderHistoryTable(data) {
       const tbody = document.getElementById('historyTableBody');
       if (!data || data.length === 0) {
@@ -680,7 +897,6 @@
       }).join('');
     }
 
-    // Fetch All API Endpoints
     async function fetchAllData() {
       const statusPill = document.getElementById('statusPill');
       const lastUpdatedText = document.getElementById('lastUpdatedText');
@@ -691,11 +907,11 @@
 
         // 1. Full Snapshot (/api/get)
         const getRes = await fetch('/api/get');
-        if (!getRes.ok) throw new Error(`HTTP ${getRes.status}`);
-        const getData = await getRes.json();
-
-        updateGauge(getData.score, getData.rating);
-        renderSnapshots(getData.history);
+        if (getRes.ok) {
+          const getData = await getRes.json();
+          updateGauge(getData.score, getData.rating);
+          renderSnapshots(getData.history);
+        }
 
         // 2. Raw CNN Payload (/api/raw) for Raw Indicator Values
         const rawRes = await fetch('/api/raw');
@@ -705,7 +921,14 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. Daily History Series (/api/history?last=30d)
+        // 3. SPY 1-Month Fibonacci Retracements (/api/spy/fibonacci)
+        const fibRes = await fetch('/api/spy/fibonacci');
+        if (fibRes.ok) {
+          currentFibData = await fibRes.json();
+          renderFibonacciTab(currentFibData);
+        }
+
+        // 4. Daily History Series (/api/history?last=30d)
         const histRes = await fetch('/api/history?last=30d');
         if (histRes.ok) {
           currentHistoryData = await histRes.json();
@@ -724,7 +947,7 @@
       }
     }
 
-    // Tabs switching
+    // Tab Switching
     document.querySelectorAll('.tabs li').forEach(tab => {
       tab.addEventListener('click', () => {
         document.querySelectorAll('.tabs li').forEach(t => t.classList.remove('is-active'));
@@ -737,6 +960,8 @@
 
         if (target === 'tab-history') {
           drawHistoryChart(currentHistoryData);
+        } else if (target === 'tab-fibonacci' && currentFibData) {
+          drawFibChart(currentFibData);
         }
       });
     });
@@ -761,7 +986,7 @@
       });
     });
 
-    // Copy JSON Button
+    // Copy JSON
     document.getElementById('copyJsonBtn').addEventListener('click', () => {
       if (!currentRawData) return;
       navigator.clipboard.writeText(JSON.stringify(currentRawData, null, 2));
@@ -771,22 +996,6 @@
     });
 
     document.getElementById('refreshBtn').addEventListener('click', fetchAllData);
-
-    // PWA Install prompt
-    let deferredPrompt;
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      const installBtn = document.getElementById('installPwaBtn');
-      installBtn.classList.remove('is-hidden');
-      installBtn.addEventListener('click', () => {
-        deferredPrompt.prompt();
-        deferredPrompt.userChoice.then(() => {
-          deferredPrompt = null;
-          installBtn.classList.add('is-hidden');
-        });
-      });
-    });
 
     // Initial Load
     fetchAllData();
