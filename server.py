@@ -21,7 +21,6 @@ app.add_middleware(
 
 @app.get("/api/get")
 def api_get():
-    """Returns snapshot: score, rating, historical points, and all 7 indicators."""
     try:
         return fear_greed.get()
     except Exception as e:
@@ -29,7 +28,6 @@ def api_get():
 
 @app.get("/api/score")
 def api_score():
-    """Returns current float score (0–100)."""
     try:
         return {"score": fear_greed.get_score()}
     except Exception as e:
@@ -37,7 +35,6 @@ def api_score():
 
 @app.get("/api/rating")
 def api_rating():
-    """Returns current rating string."""
     try:
         return {"rating": fear_greed.get_rating()}
     except Exception as e:
@@ -49,7 +46,6 @@ def api_history(
     start: str = None,
     end: str = None
 ):
-    """Returns daily historical series [{date, score, rating}, ...]."""
     try:
         kwargs = {}
         if last: kwargs["last"] = last
@@ -61,7 +57,6 @@ def api_history(
 
 @app.get("/api/raw")
 def api_raw():
-    """Returns raw payload from CNN data endpoint with raw indicator data series."""
     try:
         return fear_greed.fetch()
     except Exception as e:
@@ -73,12 +68,6 @@ def api_raw():
 def get_spy_fibonacci(
     mode: str = Query(default="calendar", description="'calendar' for prior full month, 'rolling' for past 30 days")
 ):
-    """
-    Calculates Fibonacci levels on SPY:
-    0.0%   = Lowest Close
-    100.0% = Highest Close
-    Formula: Level = Lowest Close + (Ratio * (Highest Close - Lowest Close))
-    """
     today = datetime.date.today()
     
     if mode == "calendar":
@@ -98,7 +87,7 @@ def get_spy_fibonacci(
         period_label = "Past 30 Days (Rolling)"
         end_display = today.strftime("%Y-%m-%d")
 
-    # 1. Primary method: yfinance
+    # 1. Primary Method: yfinance
     try:
         import yfinance as yf
         ticker = yf.Ticker("SPY")
@@ -108,7 +97,6 @@ def get_spy_fibonacci(
             highest_close = float(hist["Close"].max())
             lowest_close = float(hist["Close"].min())
             
-            # Fetch real-time current close
             cur_hist = yf.Ticker("SPY").history(period="1d")
             current_close = float(cur_hist["Close"].iloc[-1]) if not cur_hist.empty else float(hist["Close"].iloc[-1])
 
@@ -116,7 +104,7 @@ def get_spy_fibonacci(
             lowest_date = hist["Close"].idxmin().strftime("%Y-%m-%d")
             diff = highest_close - lowest_close
 
-            # 0% = Low, 100% = High
+            # 0% = Lowest Close, 100% = Highest Close
             levels = [
                 {"ratio": 1.0,   "label": "100.0% (1M High Close)", "type": "Swing High (Resistance)", "price": round(lowest_close + 1.000 * diff, 2), "color": "#f87171"},
                 {"ratio": 0.786, "label": "78.6% Fib Level",        "type": "Deep Pullback Target",     "price": round(lowest_close + 0.786 * diff, 2), "color": "#a78bfa"},
@@ -127,8 +115,14 @@ def get_spy_fibonacci(
                 {"ratio": 0.0,   "label": "0.0% (1M Low Close)",    "type": "Swing Low (Base Support)", "price": round(lowest_close, 2),                "color": "#34d399"}
             ]
 
+            # Daily history with High, Low, Close
             history = [
-                {"date": dt.strftime("%Y-%m-%d"), "close": round(float(row["Close"]), 2)}
+                {
+                    "date": dt.strftime("%Y-%m-%d"),
+                    "high": round(float(row["High"]), 2),
+                    "low": round(float(row["Low"]), 2),
+                    "close": round(float(row["Close"]), 2)
+                }
                 for dt, row in hist.iterrows()
             ]
 
@@ -150,7 +144,7 @@ def get_spy_fibonacci(
     except Exception as e:
         print(f"yfinance failed: {e}. Trying direct HTTP fallback...")
 
-    # 2. Resilient Direct HTTP Fallback to Yahoo Finance v8 chart API
+    # 2. Resilient Direct HTTP Fallback
     try:
         url = "https://query1.finance.yahoo.com/v8/finance/chart/SPY?range=1mo&interval=1d"
         headers = {"User-Agent": "Mozilla/5.0"}
@@ -158,13 +152,21 @@ def get_spy_fibonacci(
         if resp.status_code == 200:
             result = resp.json()["chart"]["result"][0]
             timestamps = result["timestamp"]
-            closes = result["indicators"]["quote"][0]["close"]
+            quote = result["indicators"]["quote"][0]
+            highs = quote.get("high", [])
+            lows = quote.get("low", [])
+            closes = quote.get("close", [])
 
             valid_history = []
-            for ts, c in zip(timestamps, closes):
-                if c is not None:
+            for ts, h, l, c in zip(timestamps, highs, lows, closes):
+                if c is not None and h is not None and l is not None:
                     d_str = datetime.datetime.fromtimestamp(ts, datetime.timezone.utc).strftime("%Y-%m-%d")
-                    valid_history.append({"date": d_str, "close": round(float(c), 2)})
+                    valid_history.append({
+                        "date": d_str,
+                        "high": round(float(h), 2),
+                        "low": round(float(l), 2),
+                        "close": round(float(c), 2)
+                    })
 
             if valid_history:
                 highest_pt = max(valid_history, key=lambda x: x["close"])
@@ -202,7 +204,6 @@ def get_spy_fibonacci(
 
     raise HTTPException(status_code=500, detail="Unable to retrieve SPY price data at this time.")
 
-# --- Serve Single-File PWA ---
 @app.get("/")
 def serve_index():
     return FileResponse("index.html")

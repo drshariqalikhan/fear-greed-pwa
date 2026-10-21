@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed Index and SPY 1-Month Fibonacci Retracements.">
+  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with Daily Candles.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -204,7 +204,7 @@
       </div>
     </section>
 
-    <!-- TAB 3: SPY FIBONACCI RETRACEMENT (1 MONTH) -->
+    <!-- TAB 3: SPY FIBONACCI RETRACEMENT (DAILY CANDLES) -->
     <section id="tab-fibonacci" class="tab-content is-hidden">
       <div class="level mb-3">
         <div class="level-left">
@@ -253,10 +253,17 @@
         </div>
       </div>
 
-      <!-- Fibonacci Visual Chart -->
+      <!-- Fibonacci Chart with Daily Candles -->
       <div class="card has-background-darker p-4 mb-4">
-        <h3 class="is-size-6 has-text-weight-bold mb-2">SPY Daily Closes with Fibonacci Grid</h3>
-        <div style="position: relative; width: 100%; height: 280px;">
+        <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
+          <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Fibonacci Levels</h3>
+          <div class="is-size-7 has-text-grey">
+            <span style="color: #4ade80;">● Green: Close &ge; Prev Close</span> &nbsp;|&nbsp;
+            <span style="color: #f87171;">● Red: Close &lt; Prev Close</span> &nbsp;|&nbsp;
+            <span>Stem: High–Low | Right Tick: Close</span>
+          </div>
+        </div>
+        <div style="position: relative; width: 100%; height: 320px;">
           <canvas id="fibChart"></canvas>
         </div>
       </div>
@@ -347,10 +354,10 @@
   <!-- UNIFIED APP LOGIC + INLINE SERVICE WORKER -->
   <script>
     /* ==========================================================================
-       1. INLINE SERVICE WORKER REGISTRATION (Single-File PWA Engine)
+       1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v4';
+      const CACHE_NAME = 'fear-greed-singlefile-v5';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -615,7 +622,7 @@
     }
 
     /* ==========================================================================
-       3. SPY FIBONACCI RETRACEMENT (0% = Low, 100% = High)
+       3. SPY FIBONACCI RETRACEMENT & DAILY HLC CANDLES
        ========================================================================== */
     function renderFibonacciTab(data) {
       if (!data) return;
@@ -677,6 +684,7 @@
       drawFibChart(data);
     }
 
+    // Draw Daily HLC Candles (High, Low, Close only) on Fibonacci Canvas
     function drawFibChart(data) {
       const canvas = document.getElementById('fibChart');
       if (!canvas || !data || !data.history || data.history.length === 0) return;
@@ -691,23 +699,35 @@
 
       const w = rect.width;
       const h = rect.height;
-      const padLeft = 75;
+      const padLeft = 80;
       const padRight = 35;
-      const padTop = 20;
-      const padBottom = 30;
+      const padTop = 25;
+      const padBottom = 35;
 
       ctx.clearRect(0, 0, w, h);
 
-      const high = Number(data.highest_close);
-      const low = Number(data.lowest_close);
+      const history = data.history;
       const cur = Number(data.current_close);
-      const chartRange = high - low || 1;
+
+      // Determine price limits accommodating both Fib boundaries and candle wicks
+      const allHighs = history.map(d => Number(d.high || d.close));
+      const allLows = history.map(d => Number(d.low || d.close));
+      const highestClose = Number(data.highest_close);
+      const lowestClose = Number(data.lowest_close);
+
+      const maxPrice = Math.max(highestClose, ...allHighs);
+      const minPrice = Math.min(lowestClose, ...allLows);
+      const buffer = (maxPrice - minPrice) * 0.04 || 1;
+
+      const plotMax = maxPrice + buffer;
+      const plotMin = minPrice - buffer;
+      const chartRange = plotMax - plotMin;
 
       const getY = (price) => {
-        return padTop + (high - price) / chartRange * (h - padTop - padBottom);
+        return padTop + (plotMax - price) / chartRange * (h - padTop - padBottom);
       };
 
-      // 1. Draw Fibonacci Horizontal Lines
+      // 1. Draw Fibonacci Horizontal Reference Lines
       data.levels.forEach(lvl => {
         const y = getY(lvl.price);
         ctx.beginPath();
@@ -741,38 +761,59 @@
       ctx.textAlign = 'left';
       ctx.fillText(`NOW: $${cur.toFixed(2)}`, w - padRight + 4, curY + 3);
 
-      // 3. Draw SPY Daily Close Price Line
-      const history = data.history;
-      const stepX = (w - padLeft - padRight) / (history.length - 1 || 1);
-
-      ctx.beginPath();
-      history.forEach((pt, i) => {
-        const x = padLeft + i * stepX;
-        const y = getY(pt.close);
-        if (i === 0) ctx.moveTo(x, y);
-        else ctx.lineTo(x, y);
-      });
-      ctx.strokeStyle = '#f8fafc';
-      ctx.lineWidth = 2.5;
-      ctx.stroke();
+      // 3. Draw Daily HLC Candles (High, Low, Close Only)
+      const count = history.length;
+      const stepX = (w - padLeft - padRight) / (count || 1);
+      const tickLength = Math.max(4, Math.min(9, stepX * 0.45));
 
       history.forEach((pt, i) => {
-        const x = padLeft + i * stepX;
-        const y = getY(pt.close);
+        const x = padLeft + (i + 0.5) * stepX;
+        const dHigh = Number(pt.high !== undefined ? pt.high : pt.close);
+        const dLow = Number(pt.low !== undefined ? pt.low : pt.close);
+        const dClose = Number(pt.close);
+
+        const yHigh = getY(dHigh);
+        const yLow = getY(dLow);
+        const yClose = getY(dClose);
+
+        // Bullish (Green) if close >= previous day's close; Bearish (Red) otherwise
+        const isBullish = i === 0 ? true : dClose >= Number(history[i - 1].close);
+        const color = isBullish ? '#4ade80' : '#f87171';
+
+        // Vertical Candle Stem: Daily High to Daily Low
         ctx.beginPath();
-        ctx.arc(x, y, 3, 0, Math.PI * 2);
-        ctx.fillStyle = pt.close >= low + chartRange / 2 ? '#4ade80' : '#f87171';
-        ctx.fill();
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 1.8;
+        ctx.moveTo(x, yHigh);
+        ctx.lineTo(x, yLow);
+        ctx.stroke();
+
+        // Subtle High & Low Horizontal Caps
+        ctx.beginPath();
+        ctx.lineWidth = 1.2;
+        ctx.moveTo(x - 2, yHigh);
+        ctx.lineTo(x + 2, yHigh);
+        ctx.moveTo(x - 2, yLow);
+        ctx.lineTo(x + 2, yLow);
+        ctx.stroke();
+
+        // Horizontal Right Tick: Daily Close Only
+        ctx.beginPath();
+        ctx.lineWidth = 2.4;
+        ctx.moveTo(x, yClose);
+        ctx.lineTo(x + tickLength, yClose);
+        ctx.stroke();
       });
 
+      // 4. X-Axis Date markers
       ctx.fillStyle = '#64748b';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
       if (history.length > 0) {
-        ctx.fillText(history[0].date.slice(5), padLeft, h - 8);
+        ctx.fillText(history[0].date.slice(5), padLeft, h - 10);
         const midIdx = Math.floor(history.length / 2);
-        ctx.fillText(history[midIdx].date.slice(5), padLeft + midIdx * stepX, h - 8);
-        ctx.fillText(history[history.length - 1].date.slice(5), w - padRight, h - 8);
+        ctx.fillText(history[midIdx].date.slice(5), padLeft + (midIdx + 0.5) * stepX, h - 10);
+        ctx.fillText(history[history.length - 1].date.slice(5), w - padRight, h - 10);
       }
     }
 
@@ -940,7 +981,7 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. SPY Fibonacci Retracements
+        // 3. SPY Fibonacci Retracements with Daily Candles
         await fetchFibonacci(currentFibMode);
 
         // 4. Daily History Series (/api/history?last=30d)
