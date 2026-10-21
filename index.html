@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="Single-page PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with Daily Candles.">
+  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with Price Action Phases.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -22,6 +22,9 @@
       --color-neutral: #ffeaa7;
       --color-greed: #2ed573;
       --color-extreme-greed: #10ac84;
+      --phase-breakout: #22c55e;
+      --phase-breakdown: #ef4444;
+      --phase-consolidation: #94a3b8;
     }
     body { min-height: 100vh; background-color: #0b0f19; }
     .gauge-container { max-width: 420px; margin: 0 auto; }
@@ -66,6 +69,30 @@
     .fib-badge {
       font-family: monospace;
       font-weight: bold;
+    }
+    .phase-pill {
+      font-size: 0.75rem;
+      padding: 0.25rem 0.6rem;
+      border-radius: 4px;
+      display: inline-flex;
+      align-items: center;
+      gap: 0.35rem;
+      font-weight: 600;
+    }
+    .phase-pill.breakout {
+      background: rgba(34, 197, 94, 0.15);
+      color: #4ade80;
+      border: 1px solid rgba(34, 197, 94, 0.4);
+    }
+    .phase-pill.breakdown {
+      background: rgba(239, 68, 68, 0.15);
+      color: #f87171;
+      border: 1px solid rgba(239, 68, 68, 0.4);
+    }
+    .phase-pill.consolidation {
+      background: rgba(148, 163, 184, 0.1);
+      color: #cbd5e1;
+      border: 1px solid rgba(148, 163, 184, 0.25);
     }
   </style>
 </head>
@@ -204,7 +231,7 @@
       </div>
     </section>
 
-    <!-- TAB 3: SPY FIBONACCI RETRACEMENT (DAILY CANDLES) -->
+    <!-- TAB 3: SPY FIBONACCI RETRACEMENT & PRICE ACTION PHASES -->
     <section id="tab-fibonacci" class="tab-content is-hidden">
       <div class="level mb-3">
         <div class="level-left">
@@ -232,6 +259,15 @@
         </div>
         <div class="column is-6-tablet is-3-desktop">
           <div class="metric-card p-4">
+            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">Active Price Phase</span>
+            <div class="mt-2" id="currentPhaseBadge">
+              <span class="phase-pill consolidation">Calculating...</span>
+            </div>
+            <span class="is-size-7 has-text-grey mt-1 is-block" id="currentPhaseDetail">Awaiting candle comparison</span>
+          </div>
+        </div>
+        <div class="column is-6-tablet is-3-desktop">
+          <div class="metric-card p-4">
             <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1M Highest Close (100.0%)</span>
             <div class="is-size-3 has-text-weight-bold has-text-danger-light mt-1" id="spyHighClose">$--</div>
             <span class="is-size-7 has-text-grey" id="spyHighDate">Peak Date: --</span>
@@ -244,26 +280,20 @@
             <span class="is-size-7 has-text-grey" id="spyLowDate">Trough Date: --</span>
           </div>
         </div>
-        <div class="column is-6-tablet is-3-desktop">
-          <div class="metric-card p-4">
-            <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">1-Month Spread</span>
-            <div class="is-size-3 has-text-weight-bold has-text-warning mt-1" id="spyRange">$--</div>
-            <span class="is-size-7 has-text-grey" id="spyRangePct">Range: --%</span>
-          </div>
-        </div>
       </div>
 
-      <!-- Fibonacci Chart with Daily Candles -->
+      <!-- Fibonacci Chart with Price Action Phase Color Coding -->
       <div class="card has-background-darker p-4 mb-4">
-        <div class="is-flex is-justify-content-space-between is-align-items-center mb-2">
-          <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Fibonacci Levels</h3>
-          <div class="is-size-7 has-text-grey">
-            <span style="color: #4ade80;">● Green: Close &ge; Prev Close</span> &nbsp;|&nbsp;
-            <span style="color: #f87171;">● Red: Close &lt; Prev Close</span> &nbsp;|&nbsp;
-            <span>Stem: High–Low | Right Tick: Close</span>
+        <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap gap-2 mb-2">
+          <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Price Action Phases</h3>
+          <!-- Interactive Phase Legend -->
+          <div class="is-flex is-align-items-center is-flex-wrap-wrap gap-2 is-size-7">
+            <span class="phase-pill breakout">🚀 Break Out Phase (Low &gt; Prev High)</span>
+            <span class="phase-pill breakdown">🔻 Break Down Phase (High &lt; Prev Low)</span>
+            <span class="phase-pill consolidation">⚖️ Consolidation Phase (Overlap)</span>
           </div>
         </div>
-        <div style="position: relative; width: 100%; height: 320px;">
+        <div style="position: relative; width: 100%; height: 330px;">
           <canvas id="fibChart"></canvas>
         </div>
       </div>
@@ -357,7 +387,7 @@
        1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v5';
+      const CACHE_NAME = 'fear-greed-singlefile-v6';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -622,8 +652,51 @@
     }
 
     /* ==========================================================================
-       3. SPY FIBONACCI RETRACEMENT & DAILY HLC CANDLES
+       3. PRICE ACTION PHASE CLASSIFICATION & FIBONACCI CHART
        ========================================================================== */
+    /**
+     * Evaluates the Price Action Phase for candle i against candle i-1:
+     * - Break Out:  curr.low > prev.high
+     * - Break Down: curr.high < prev.low
+     * - Consolidation: neither (ranges overlap)
+     */
+    function classifyPricePhase(history, i) {
+      if (!history || i === 0 || i >= history.length) {
+        return { phase: 'consolidation', label: 'Consolidation', color: '#94a3b8', detail: 'Baseline Candle' };
+      }
+
+      const curr = history[i];
+      const prev = history[i - 1];
+
+      const cLow = Number(curr.low !== undefined ? curr.low : curr.close);
+      const cHigh = Number(curr.high !== undefined ? curr.high : curr.close);
+      const pLow = Number(prev.low !== undefined ? prev.low : prev.close);
+      const pHigh = Number(prev.high !== undefined ? prev.high : prev.close);
+
+      if (cLow > pHigh) {
+        return {
+          phase: 'breakout',
+          label: 'Break Out Phase',
+          color: '#22c55e',
+          detail: `Low ($${cLow.toFixed(2)}) > Prev High ($${pHigh.toFixed(2)})`
+        };
+      } else if (cHigh < pLow) {
+        return {
+          phase: 'breakdown',
+          label: 'Break Down Phase',
+          color: '#ef4444',
+          detail: `High ($${cHigh.toFixed(2)}) < Prev Low ($${pLow.toFixed(2)})`
+        };
+      } else {
+        return {
+          phase: 'consolidation',
+          label: 'Consolidation Phase',
+          color: '#94a3b8',
+          detail: `Inside Range (High: $${cHigh.toFixed(2)}, Low: $${cLow.toFixed(2)})`
+        };
+      }
+    }
+
     function renderFibonacciTab(data) {
       if (!data) return;
 
@@ -638,17 +711,26 @@
       document.getElementById('spyHighDate').textContent = `Peak Date: ${data.highest_date}`;
       document.getElementById('spyLowClose').textContent = `$${low.toFixed(2)}`;
       document.getElementById('spyLowDate').textContent = `Trough Date: ${data.lowest_date}`;
-      document.getElementById('spyRange').textContent = `$${range.toFixed(2)}`;
-      document.getElementById('spyRangePct').textContent = `Monthly Swing: ${rangePct}%`;
 
       const statusSpan = document.getElementById('spyCurrentStatus');
       if (cur >= high) {
-        statusSpan.innerHTML = `<span class="tag is-success is-light">Trading at or above 100% High</span>`;
+        statusSpan.innerHTML = `<span class="tag is-success is-light">At/above 100% High ($${high.toFixed(2)})</span>`;
       } else if (cur <= low) {
-        statusSpan.innerHTML = `<span class="tag is-danger is-light">Trading at or below 0% Low</span>`;
+        statusSpan.innerHTML = `<span class="tag is-danger is-light">At/below 0% Low ($${low.toFixed(2)})</span>`;
       } else {
         const pctFromLow = (((cur - low) / range) * 100).toFixed(1);
-        statusSpan.innerHTML = `<span class="tag is-info is-light">${pctFromLow}% Position in Monthly Range</span>`;
+        statusSpan.innerHTML = `<span class="tag is-info is-light">${pctFromLow}% in Range (Swing: ${rangePct}%)</span>`;
+      }
+
+      // Active Price Phase on Most Recent Candle
+      const hist = data.history || [];
+      if (hist.length > 0) {
+        const lastPhaseInfo = classifyPricePhase(hist, hist.length - 1);
+        const badgeContainer = document.getElementById('currentPhaseBadge');
+        const detailContainer = document.getElementById('currentPhaseDetail');
+
+        badgeContainer.innerHTML = `<span class="phase-pill ${lastPhaseInfo.phase}">${lastPhaseInfo.label}</span>`;
+        detailContainer.textContent = lastPhaseInfo.detail;
       }
 
       // Render Levels Table
@@ -684,7 +766,7 @@
       drawFibChart(data);
     }
 
-    // Draw Daily HLC Candles (High, Low, Close only) on Fibonacci Canvas
+    // Draw SPY Fibonacci Canvas Chart with Price Action Phase Zones & HLC Candles
     function drawFibChart(data) {
       const canvas = document.getElementById('fibChart');
       if (!canvas || !data || !data.history || data.history.length === 0) return;
@@ -699,9 +781,9 @@
 
       const w = rect.width;
       const h = rect.height;
-      const padLeft = 80;
+      const padLeft = 85;
       const padRight = 35;
-      const padTop = 25;
+      const padTop = 30;
       const padBottom = 35;
 
       ctx.clearRect(0, 0, w, h);
@@ -709,15 +791,15 @@
       const history = data.history;
       const cur = Number(data.current_close);
 
-      // Determine price limits accommodating both Fib boundaries and candle wicks
-      const allHighs = history.map(d => Number(d.high || d.close));
-      const allLows = history.map(d => Number(d.low || d.close));
+      // Determine full price envelope for grid
+      const allHighs = history.map(d => Number(d.high !== undefined ? d.high : d.close));
+      const allLows = history.map(d => Number(d.low !== undefined ? d.low : d.close));
       const highestClose = Number(data.highest_close);
       const lowestClose = Number(data.lowest_close);
 
       const maxPrice = Math.max(highestClose, ...allHighs);
       const minPrice = Math.min(lowestClose, ...allLows);
-      const buffer = (maxPrice - minPrice) * 0.04 || 1;
+      const buffer = (maxPrice - minPrice) * 0.05 || 1;
 
       const plotMax = maxPrice + buffer;
       const plotMin = minPrice - buffer;
@@ -727,7 +809,34 @@
         return padTop + (plotMax - price) / chartRange * (h - padTop - padBottom);
       };
 
-      // 1. Draw Fibonacci Horizontal Reference Lines
+      const count = history.length;
+      const stepX = (w - padLeft - padRight) / (count || 1);
+
+      // 1. Shaded Background Columns for Price Action Phases
+      history.forEach((pt, i) => {
+        const xStart = padLeft + i * stepX;
+        const phaseInfo = classifyPricePhase(history, i);
+
+        if (phaseInfo.phase === 'breakout') {
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.16)'; // Light Green
+        } else if (phaseInfo.phase === 'breakdown') {
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.16)'; // Light Red
+        } else {
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.04)'; // Subtle Slate
+        }
+
+        ctx.fillRect(xStart, padTop, stepX, h - padTop - padBottom);
+
+        // Subtle vertical separator between days
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.moveTo(xStart, padTop);
+        ctx.lineTo(xStart, h - padBottom);
+        ctx.stroke();
+      });
+
+      // 2. Fibonacci Reference Horizontal Lines
       data.levels.forEach(lvl => {
         const y = getY(lvl.price);
         ctx.beginPath();
@@ -745,7 +854,7 @@
         ctx.fillText(`$${lvl.price.toFixed(2)} (${(lvl.ratio * 100).toFixed(0)}%)`, padLeft - 6, y + 3);
       });
 
-      // 2. Draw Current Price Marker Line
+      // 3. Current Price Horizontal Marker Line
       const curY = getY(cur);
       ctx.beginPath();
       ctx.strokeStyle = '#38bdf8';
@@ -761,10 +870,8 @@
       ctx.textAlign = 'left';
       ctx.fillText(`NOW: $${cur.toFixed(2)}`, w - padRight + 4, curY + 3);
 
-      // 3. Draw Daily HLC Candles (High, Low, Close Only)
-      const count = history.length;
-      const stepX = (w - padLeft - padRight) / (count || 1);
-      const tickLength = Math.max(4, Math.min(9, stepX * 0.45));
+      // 4. Daily HLC Candles (High, Low, Close only) Color Coded by Phase
+      const tickLength = Math.max(4, Math.min(10, stepX * 0.45));
 
       history.forEach((pt, i) => {
         const x = padLeft + (i + 0.5) * stepX;
@@ -776,19 +883,24 @@
         const yLow = getY(dLow);
         const yClose = getY(dClose);
 
-        // Bullish (Green) if close >= previous day's close; Bearish (Red) otherwise
-        const isBullish = i === 0 ? true : dClose >= Number(history[i - 1].close);
-        const color = isBullish ? '#4ade80' : '#f87171';
+        const phaseInfo = classifyPricePhase(history, i);
+        let candleColor = phaseInfo.color;
 
-        // Vertical Candle Stem: Daily High to Daily Low
+        // In consolidation, if close was higher than prior close, brighten to cyan, else dark slate
+        if (phaseInfo.phase === 'consolidation' && i > 0) {
+          const prevClose = Number(history[i - 1].close);
+          candleColor = dClose >= prevClose ? '#38bdf8' : '#94a3b8';
+        }
+
+        // Vertical Wick/Stem: High to Low
         ctx.beginPath();
-        ctx.strokeStyle = color;
-        ctx.lineWidth = 1.8;
+        ctx.strokeStyle = candleColor;
+        ctx.lineWidth = 2.0;
         ctx.moveTo(x, yHigh);
         ctx.lineTo(x, yLow);
         ctx.stroke();
 
-        // Subtle High & Low Horizontal Caps
+        // Horizontal Caps at High and Low
         ctx.beginPath();
         ctx.lineWidth = 1.2;
         ctx.moveTo(x - 2, yHigh);
@@ -797,15 +909,23 @@
         ctx.lineTo(x + 2, yLow);
         ctx.stroke();
 
-        // Horizontal Right Tick: Daily Close Only
+        // Horizontal Right Tick: Close only
         ctx.beginPath();
-        ctx.lineWidth = 2.4;
+        ctx.lineWidth = 2.8;
         ctx.moveTo(x, yClose);
         ctx.lineTo(x + tickLength, yClose);
         ctx.stroke();
+
+        // Mini Phase Marker Dot on Top
+        if (phaseInfo.phase === 'breakout' || phaseInfo.phase === 'breakdown') {
+          ctx.beginPath();
+          ctx.arc(x, padTop + 8, 3, 0, Math.PI * 2);
+          ctx.fillStyle = phaseInfo.color;
+          ctx.fill();
+        }
       });
 
-      // 4. X-Axis Date markers
+      // 5. X-Axis Date Labels
       ctx.fillStyle = '#64748b';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
@@ -981,7 +1101,7 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. SPY Fibonacci Retracements with Daily Candles
+        // 3. SPY Fibonacci Retracements with Phase-Colored HLC Candles
         await fetchFibonacci(currentFibMode);
 
         // 4. Daily History Series (/api/history?last=30d)
