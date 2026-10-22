@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with 0-Overlap Price Action Phase Confirmation.">
+  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with Float Up/Down Consolidation Phases.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -24,7 +24,9 @@
       --color-extreme-greed: #10ac84;
       --phase-breakout: #22c55e;
       --phase-breakdown: #ef4444;
-      --phase-consolidation: #94a3b8;
+      --phase-consolidation-up: #38bdf8;
+      --phase-consolidation-down: #fb923c;
+      --phase-consolidation-neutral: #94a3b8;
     }
     body { min-height: 100vh; background-color: #0b0f19; }
     .gauge-container { max-width: 420px; margin: 0 auto; }
@@ -89,10 +91,20 @@
       color: #f87171;
       border: 1px solid rgba(239, 68, 68, 0.4);
     }
-    .phase-pill.consolidation {
-      background: rgba(148, 163, 184, 0.1);
+    .phase-pill.consolidation-up {
+      background: rgba(56, 189, 248, 0.15);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+    .phase-pill.consolidation-down {
+      background: rgba(251, 146, 60, 0.15);
+      color: #fb923c;
+      border: 1px solid rgba(251, 146, 60, 0.4);
+    }
+    .phase-pill.consolidation-neutral {
+      background: rgba(148, 163, 184, 0.12);
       color: #cbd5e1;
-      border: 1px solid rgba(148, 163, 184, 0.25);
+      border: 1px solid rgba(148, 163, 184, 0.3);
     }
   </style>
 </head>
@@ -261,9 +273,9 @@
           <div class="metric-card p-4">
             <span class="is-size-7 has-text-grey uppercase has-text-weight-bold">Current Price Action Phase</span>
             <div class="mt-2" id="currentPhaseBadge">
-              <span class="phase-pill consolidation">Calculating...</span>
+              <span class="phase-pill consolidation-neutral">Calculating...</span>
             </div>
-            <span class="is-size-7 has-text-grey mt-1 is-block" id="currentPhaseDetail">Evaluating 2-day gap &amp; 0%–100% boundary</span>
+            <span class="is-size-7 has-text-grey mt-1 is-block" id="currentPhaseDetail">Evaluating consolidation ratio vs 50% Fib</span>
           </div>
         </div>
         <div class="column is-6-tablet is-3-desktop">
@@ -285,12 +297,14 @@
       <!-- Fibonacci Chart with Price Action Phase Zones -->
       <div class="card has-background-darker p-4 mb-4">
         <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap gap-2 mb-2">
-          <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Confirmed Price Action Phases</h3>
-          <!-- Updated Phase Legend -->
+          <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Consolidation Float Phases</h3>
+          <!-- Updated 5-Phase Legend -->
           <div class="is-flex is-align-items-center is-flex-wrap-wrap gap-2 is-size-7">
-            <span class="phase-pill breakout">🚀 Break Out (0 Overlap &amp; Close &gt; 100% Fib)</span>
-            <span class="phase-pill breakdown">🔻 Break Down (0 Overlap &amp; Close &lt; 0% Fib)</span>
-            <span class="phase-pill consolidation">⚖️ Consolidation (Overlap or Inside 0%–100%)</span>
+            <span class="phase-pill breakout">🚀 Break Out (Low &gt; Prev High &amp; Close &gt; 100%)</span>
+            <span class="phase-pill breakdown">🔻 Break Down (High &lt; Prev Low &amp; Close &lt; 0%)</span>
+            <span class="phase-pill consolidation-up">📈 Float Up Consolidation (&gt;50% Closes &gt; 50% Fib)</span>
+            <span class="phase-pill consolidation-down">📉 Float Down Consolidation (&gt;50% Closes &lt; 50% Fib)</span>
+            <span class="phase-pill consolidation-neutral">⚖️ Neutral Consolidation (Balanced)</span>
           </div>
         </div>
         <div style="position: relative; width: 100%; height: 330px;">
@@ -387,7 +401,7 @@
        1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v8';
+      const CACHE_NAME = 'fear-greed-singlefile-v9';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -652,69 +666,101 @@
     }
 
     /* ==========================================================================
-       3. PRICE ACTION PHASE CLASSIFICATION (0% / 100% FIBONACCI BOUNDARIES)
+       3. PRICE ACTION PHASE CLASSIFICATION WITH CONSOLIDATION FLOAT UP/DOWN
        ========================================================================== */
     /**
-     * Updated Phase Definition:
-     * - Break Out:  (curr.low > prev.high) AND (curr.close > fib100)
-     * - Break Down: (curr.high < prev.low) AND (curr.close < fib0)
-     * - Consolidation: any condition failing above (price overlap or close inside 0%–100%)
+     * Evaluates all days and classifies into:
+     * - Break Out: (Low > Prev High) AND (Close > Fib 100%)
+     * - Break Down: (High < Prev Low) AND (Close < Fib 0%)
+     * - Consolidation:
+     *    * Float Up Consolidation: >50% of consolidation closes are ABOVE 50% Fib
+     *    * Float Down Consolidation: >50% of consolidation closes are BELOW 50% Fib
+     *    * Neutral Consolidation: Remaining times (balanced/tied <=50%)
      */
-    function classifyPricePhase(history, i, fib0, fib100) {
-      if (!history || i === 0 || i >= history.length) {
-        return {
-          phase: 'consolidation',
-          label: 'Consolidation',
-          color: '#94a3b8',
-          detail: 'Baseline Day (No Prior Comparison)'
-        };
-      }
+    function classifyAllPricePhases(history, fib0, fib50, fib100) {
+      if (!history || history.length === 0) return [];
 
-      const curr = history[i];
-      const prev = history[i - 1];
+      let consolTotal = 0;
+      let consolAbove50 = 0;
+      let consolBelow50 = 0;
+      const results = [];
 
-      const cLow = Number(curr.low !== undefined ? curr.low : curr.close);
-      const cHigh = Number(curr.high !== undefined ? curr.high : curr.close);
-      const cClose = Number(curr.close);
+      for (let i = 0; i < history.length; i++) {
+        const curr = history[i];
+        const cLow = Number(curr.low !== undefined ? curr.low : curr.close);
+        const cHigh = Number(curr.high !== undefined ? curr.high : curr.close);
+        const cClose = Number(curr.close);
 
-      const pLow = Number(prev.low !== undefined ? prev.low : prev.close);
-      const pHigh = Number(prev.high !== undefined ? prev.high : prev.close);
+        let isBreakout = false;
+        let isBreakdown = false;
 
-      const hasZeroOverlapUp = cLow > pHigh;
-      const hasZeroOverlapDown = cHigh < pLow;
-      const isAboveFib100 = cClose > fib100;
-      const isBelowFib0 = cClose < fib0;
+        if (i > 0) {
+          const prev = history[i - 1];
+          const pLow = Number(prev.low !== undefined ? prev.low : prev.close);
+          const pHigh = Number(prev.high !== undefined ? prev.high : prev.close);
 
-      if (hasZeroOverlapUp && isAboveFib100) {
-        return {
-          phase: 'breakout',
-          label: 'Break Out Phase',
-          color: '#22c55e',
-          detail: `Zero Overlap (Low $${cLow.toFixed(2)} > Prev High $${pHigh.toFixed(2)}) & Close $${cClose.toFixed(2)} > 100% Fib ($${fib100.toFixed(2)})`
-        };
-      } else if (hasZeroOverlapDown && isBelowFib0) {
-        return {
-          phase: 'breakdown',
-          label: 'Break Down Phase',
-          color: '#ef4444',
-          detail: `Zero Overlap (High $${cHigh.toFixed(2)} < Prev Low $${pLow.toFixed(2)}) & Close $${cClose.toFixed(2)} < 0% Fib ($${fib0.toFixed(2)})`
-        };
-      } else {
-        let reason = 'Range Overlap with Prior Day';
-        if (hasZeroOverlapUp && !isAboveFib100) {
-          reason = `Gap Up (Low > Prev High), but Close $${cClose.toFixed(2)} <= 100% Fib ($${fib100.toFixed(2)})`;
-        } else if (hasZeroOverlapDown && !isBelowFib0) {
-          reason = `Gap Down (High < Prev Low), but Close $${cClose.toFixed(2)} >= 0% Fib ($${fib0.toFixed(2)})`;
-        } else if (!hasZeroOverlapUp && !hasZeroOverlapDown && (isAboveFib100 || isBelowFib0)) {
-          reason = `Close Outside Fib Range, but Bars Overlap (No Clean Gap)`;
+          // Break Out: 0 overlap up AND close > 100% Fib
+          if (cLow > pHigh && cClose > fib100) {
+            isBreakout = true;
+          }
+          // Break Down: 0 overlap down AND close < 0% Fib
+          else if (cHigh < pLow && cClose < fib0) {
+            isBreakdown = true;
+          }
         }
-        return {
-          phase: 'consolidation',
-          label: 'Consolidation Phase',
-          color: '#94a3b8',
-          detail: reason
-        };
+
+        if (isBreakout) {
+          results.push({
+            phase: 'breakout',
+            label: 'Break Out Phase',
+            color: '#22c55e',
+            detail: `Zero Overlap (Low > Prev High) & Close $${cClose.toFixed(2)} > 100% Fib ($${fib100.toFixed(2)})`
+          });
+        } else if (isBreakdown) {
+          results.push({
+            phase: 'breakdown',
+            label: 'Break Down Phase',
+            color: '#ef4444',
+            detail: `Zero Overlap (High < Prev Low) & Close $${cClose.toFixed(2)} < 0% Fib ($${fib0.toFixed(2)})`
+          });
+        } else {
+          // Consolidation Day: Track close relative to 50% Fib
+          consolTotal++;
+          if (cClose > fib50) {
+            consolAbove50++;
+          } else if (cClose < fib50) {
+            consolBelow50++;
+          }
+
+          const pctAbove = (consolAbove50 / consolTotal) * 100;
+          const pctBelow = (consolBelow50 / consolTotal) * 100;
+
+          if (pctAbove > 50) {
+            results.push({
+              phase: 'consolidation-up',
+              label: 'Float Up Consolidation Phase',
+              color: '#38bdf8',
+              detail: `Consolidation: ${pctAbove.toFixed(1)}% of closes (>50%) above 50% Fib ($${fib50.toFixed(2)}) [${consolAbove50}/${consolTotal} days]`
+            });
+          } else if (pctBelow > 50) {
+            results.push({
+              phase: 'consolidation-down',
+              label: 'Float Down Consolidation Phase',
+              color: '#fb923c',
+              detail: `Consolidation: ${pctBelow.toFixed(1)}% of closes (>50%) below 50% Fib ($${fib50.toFixed(2)}) [${consolBelow50}/${consolTotal} days]`
+            });
+          } else {
+            results.push({
+              phase: 'consolidation-neutral',
+              label: 'Neutral Consolidation Phase',
+              color: '#94a3b8',
+              detail: `Consolidation: Balanced Closes (${pctAbove.toFixed(1)}% above, ${pctBelow.toFixed(1)}% below 50% Fib $${fib50.toFixed(2)})`
+            });
+          }
+        }
       }
+
+      return results;
     }
 
     function renderFibonacciTab(data) {
@@ -726,8 +772,9 @@
       const range = Number(data.range);
       const rangePct = ((range / low) * 100).toFixed(2);
 
-      // Boundaries: 0.0% is Lowest Close, 100.0% is Highest Close
+      // Boundaries: 0.0% is Lowest Close, 50.0% is Midpoint, 100.0% is Highest Close
       const fib0 = low;
+      const fib50 = low + 0.500 * range;
       const fib100 = high;
 
       document.getElementById('spyCurrentClose').textContent = `$${cur.toFixed(2)}`;
@@ -746,10 +793,13 @@
         statusSpan.innerHTML = `<span class="tag is-info is-light">${pctFromLow}% in Range (Swing: ${rangePct}%)</span>`;
       }
 
-      // Active Price Phase on Most Recent Candle using the 2-day zero overlap + 0%/100% rules
+      // Classify all days in series
       const hist = data.history || [];
-      if (hist.length > 0) {
-        const lastPhaseInfo = classifyPricePhase(hist, hist.length - 1, fib0, fib100);
+      const classifiedPhases = classifyAllPricePhases(hist, fib0, fib50, fib100);
+
+      // Active Price Phase on Most Recent Candle
+      if (classifiedPhases.length > 0) {
+        const lastPhaseInfo = classifiedPhases[classifiedPhases.length - 1];
         const badgeContainer = document.getElementById('currentPhaseBadge');
         const detailContainer = document.getElementById('currentPhaseDetail');
 
@@ -768,6 +818,8 @@
         let roleBadge = "";
         if (Math.abs(lvl.ratio - 1.0) < 0.01) {
           roleBadge = `<span class="tag is-success is-light has-text-weight-bold">Break Out Threshold (&gt; 100%)</span>`;
+        } else if (Math.abs(lvl.ratio - 0.5) < 0.01) {
+          roleBadge = `<span class="tag is-info is-light has-text-weight-bold">Consolidation Float Pivot (50%)</span>`;
         } else if (Math.abs(lvl.ratio - 0.0) < 0.01) {
           roleBadge = `<span class="tag is-danger is-light has-text-weight-bold">Break Down Threshold (&lt; 0%)</span>`;
         } else if (isCurrentZone) {
@@ -791,11 +843,11 @@
         `;
       }).join('');
 
-      drawFibChart(data, fib0, fib100);
+      drawFibChart(data, fib0, fib50, fib100, classifiedPhases);
     }
 
-    // Draw SPY Fibonacci Canvas Chart with Price Action Phase Zones & Daily HLC Candles
-    function drawFibChart(data, fib0, fib100) {
+    // Draw SPY Fibonacci Canvas Chart with Updated Phase Zones & Daily HLC Candles
+    function drawFibChart(data, fib0, fib50, fib100, classifiedPhases) {
       const canvas = document.getElementById('fibChart');
       if (!canvas || !data || !data.history || data.history.length === 0) return;
 
@@ -839,22 +891,26 @@
       const count = history.length;
       const stepX = (w - padLeft - padRight) / (count || 1);
 
-      // 1. Shaded Background Columns for Price Action Phases (0-Overlap + 0%/100% Fib Threshold)
+      // 1. Shaded Background Columns for Price Action Phases
       history.forEach((pt, i) => {
         const xStart = padLeft + i * stepX;
-        const phaseInfo = classifyPricePhase(history, i, fib0, fib100);
+        const phaseInfo = classifiedPhases[i] || { phase: 'consolidation-neutral' };
 
         if (phaseInfo.phase === 'breakout') {
-          ctx.fillStyle = 'rgba(34, 197, 94, 0.20)'; // Bright Green Shading
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.20)'; // Break Out Green
         } else if (phaseInfo.phase === 'breakdown') {
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.20)'; // Bright Red Shading
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.20)'; // Break Down Red
+        } else if (phaseInfo.phase === 'consolidation-up') {
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.12)'; // Float Up Sky Blue
+        } else if (phaseInfo.phase === 'consolidation-down') {
+          ctx.fillStyle = 'rgba(251, 146, 60, 0.12)'; // Float Down Amber
         } else {
-          ctx.fillStyle = 'rgba(148, 163, 184, 0.04)'; // Subtle Consolidation Slate
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.05)'; // Neutral Slate
         }
 
         ctx.fillRect(xStart, padTop, stepX, h - padTop - padBottom);
 
-        // Day boundary separator
+        // Day separator
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -869,7 +925,7 @@
         ctx.beginPath();
         ctx.setLineDash([4, 4]);
         ctx.strokeStyle = lvl.color || '#64748b';
-        ctx.lineWidth = 1;
+        ctx.lineWidth = Math.abs(lvl.ratio - 0.5) < 0.01 ? 1.5 : 1;
         ctx.moveTo(padLeft, y);
         ctx.lineTo(w - padRight, y);
         ctx.stroke();
@@ -910,13 +966,8 @@
         const yLow = getY(dLow);
         const yClose = getY(dClose);
 
-        const phaseInfo = classifyPricePhase(history, i, fib0, fib100);
-        let candleColor = phaseInfo.color;
-
-        if (phaseInfo.phase === 'consolidation' && i > 0) {
-          const prevClose = Number(history[i - 1].close);
-          candleColor = dClose >= prevClose ? '#38bdf8' : '#94a3b8';
-        }
+        const phaseInfo = classifiedPhases[i] || { phase: 'consolidation-neutral', color: '#94a3b8' };
+        const candleColor = phaseInfo.color;
 
         // Vertical Wick: High to Low
         ctx.beginPath();
@@ -943,17 +994,10 @@
         ctx.stroke();
 
         // Phase Icon Marker on Top
-        if (phaseInfo.phase === 'breakout') {
-          ctx.beginPath();
-          ctx.arc(x, padTop + 8, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#22c55e';
-          ctx.fill();
-        } else if (phaseInfo.phase === 'breakdown') {
-          ctx.beginPath();
-          ctx.arc(x, padTop + 8, 3.5, 0, Math.PI * 2);
-          ctx.fillStyle = '#ef4444';
-          ctx.fill();
-        }
+        ctx.beginPath();
+        ctx.arc(x, padTop + 8, 3.5, 0, Math.PI * 2);
+        ctx.fillStyle = phaseInfo.color;
+        ctx.fill();
       });
 
       // 5. X-Axis Date Labels
@@ -1170,7 +1214,10 @@
         } else if (target === 'tab-fibonacci' && currentFibData) {
           const low = Number(currentFibData.lowest_close);
           const high = Number(currentFibData.highest_close);
-          drawFibChart(currentFibData, low, high);
+          const range = Number(currentFibData.range);
+          const fib50 = low + 0.500 * range;
+          const phases = classifyAllPricePhases(currentFibData.history || [], low, fib50, high);
+          drawFibChart(currentFibData, low, fib50, high, phases);
         }
       });
     });
