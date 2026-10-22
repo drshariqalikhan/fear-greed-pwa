@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index, Breakout-Breakdown Probability Gauge, and SPY Fibonacci Retracements.">
+  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index, Breakout-Breakdown Probability Gauge (Rolling 30D), and SPY Fibonacci Retracements.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -208,11 +208,11 @@
           </div>
         </div>
 
-        <!-- Gauge 2: Breakout-Breakdown Probability Gauge -->
+        <!-- Gauge 2: Breakout-Breakdown Probability Gauge (Using Rolling 30D Fib Levels) -->
         <div class="column is-12-tablet is-6-desktop">
           <div class="card has-background-darker p-5 h-100">
             <h2 class="title is-5 has-text-centered mb-1">⚡ Breakout-Breakdown Gauge</h2>
-            <p class="subtitle is-7 has-text-centered has-text-grey">Market Maker vs Technical Probability Model</p>
+            <p class="subtitle is-7 has-text-centered has-text-grey">Market Maker vs <strong>Rolling 30-Day SPY</strong> Probability Model</p>
             
             <div class="gauge-container py-3">
               <svg viewBox="0 0 300 170" width="100%">
@@ -248,7 +248,7 @@
           </div>
         </div>
 
-        <!-- Row 2, Col 1: 3 Probability Drivers Breakdown -->
+        <!-- Row 2, Col 1: 3 Probability Drivers Breakdown (Rolling 30D Anchored) -->
         <div class="column is-12-tablet is-6-desktop">
           <div class="card has-background-darker p-5 h-100">
             <h2 class="title is-5 mb-2">Breakout-Breakdown Drivers</h2>
@@ -266,14 +266,14 @@
                 </p>
               </div>
 
-              <!-- Driver 2: Consolidation Float Phase -->
+              <!-- Driver 2: Rolling 30D Consolidation Float Phase -->
               <div class="factor-item">
                 <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
-                  <span class="has-text-weight-semibold is-size-7">2. Price Action Float Phase (Structure)</span>
+                  <span class="has-text-weight-semibold is-size-7">2. Price Action Float Phase (Rolling 30-Day SPY)</span>
                   <span class="tag is-small" id="factorPhaseBadge">Analyzing...</span>
                 </div>
                 <p class="is-size-7 has-text-grey" id="factorPhaseDetail">
-                  Float up consolidation favors an upside breakout; float down consolidation favors breakdown.
+                  Rolling 30-day float up consolidation favors break out; float down consolidation favors breakdown.
                 </p>
               </div>
 
@@ -313,7 +313,7 @@
             <div class="box has-background-dark py-3 px-4 mt-4">
               <h3 class="is-size-7 has-text-weight-bold has-text-grey-light uppercase">How to read the two gauges</h3>
               <p class="is-size-7 has-text-grey mt-1">
-                The <strong>Fear &amp; Greed Gauge</strong> measures what the crowd is feeling right now. The <strong>Breakout-Breakdown Gauge</strong> forecasts where institutional market makers and technical flows are positioned to force price next.
+                The <strong>Fear &amp; Greed Gauge</strong> measures crowd sentiment. The <strong>Breakout-Breakdown Gauge</strong> uses Market Maker positioning, safe haven flows, and <strong>Rolling 30-Day Fibonacci structure</strong> to forecast the highest-probability path.
               </p>
             </div>
           </div>
@@ -490,7 +490,7 @@
        1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v10';
+      const CACHE_NAME = 'fear-greed-singlefile-v11';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -563,6 +563,7 @@
     let currentRawData = null;
     let currentHistoryData = [];
     let currentFibData = null;
+    let rollingFibData = null; // Stored specifically for Breakout-Breakdown Gauge
     let currentFibMode = 'calendar';
 
     function formatRating(rating) {
@@ -843,13 +844,12 @@
     }
 
     /* ==========================================================================
-       4. BREAKOUT-BREAKDOWN PROBABILITY GAUGE MODEL (HOME PAGE)
+       4. BREAKOUT-BREAKDOWN PROBABILITY GAUGE (ANCHORED TO ROLLING 30D FIB)
        ========================================================================== */
-    function updateBreakoutBreakdownGauge(rawPayload, fibData) {
+    function updateBreakoutBreakdownGauge(rawPayload, rollingFib) {
       if (!rawPayload) return;
 
       // --- Factor 1: Market Maker Positioning (Inverse Put/Call Ratio) ---
-      // Weight: 35%
       let mmScore = 50;
       let mmText = "Neutral / Balanced";
       let mmBadgeClass = "is-dark";
@@ -880,40 +880,40 @@
       document.getElementById('factorMmBadge').textContent = mmScore > 55 ? "Favors Break Out" : (mmScore < 45 ? "Favors Break Down" : "Neutral");
       document.getElementById('factorMmDetail').textContent = mmText;
 
-      // --- Factor 2: Consolidation Float Phase (Technical Structure) ---
-      // Weight: 35%
+      // --- Factor 2: ROLLING 30-DAY Consolidation Float Phase ---
       let phaseScore = 50;
-      let phaseText = "Neutral Consolidation (Balanced closes around 50% Fib)";
+      let phaseText = "Evaluating Rolling 30-Day SPY Structure...";
       let phaseBadgeClass = "is-dark";
 
-      if (fibData && fibData.history && fibData.history.length > 0) {
-        const low = Number(fibData.lowest_close);
-        const high = Number(fibData.highest_close);
-        const range = Number(fibData.range);
+      if (rollingFib && rollingFib.history && rollingFib.history.length > 0) {
+        const low = Number(rollingFib.lowest_close);
+        const high = Number(rollingFib.highest_close);
+        const range = Number(rollingFib.range);
         const fib50 = low + 0.500 * range;
 
-        const phases = classifyAllPricePhases(fibData.history, low, fib50, high);
+        // Classify price action using strictly the rolling 30-day levels
+        const phases = classifyAllPricePhases(rollingFib.history, low, fib50, high);
         const lastPhase = phases[phases.length - 1];
 
         if (lastPhase.phase === 'consolidation-up') {
           phaseScore = 80;
-          phaseText = `Favors Break Out — ${lastPhase.detail}`;
+          phaseText = `Favors Break Out — 30D Rolling Structure: ${lastPhase.detail}`;
           phaseBadgeClass = "is-info is-light";
         } else if (lastPhase.phase === 'consolidation-down') {
           phaseScore = 20;
-          phaseText = `Favors Break Down — ${lastPhase.detail}`;
+          phaseText = `Favors Break Down — 30D Rolling Structure: ${lastPhase.detail}`;
           phaseBadgeClass = "is-warning is-light";
         } else if (lastPhase.phase === 'breakout') {
           phaseScore = 95;
-          phaseText = `Active Break Out confirmed above 100% Fib!`;
+          phaseText = `Active Break Out confirmed above Rolling 30D 100% Fib ($${high.toFixed(2)})!`;
           phaseBadgeClass = "is-success is-light";
         } else if (lastPhase.phase === 'breakdown') {
           phaseScore = 5;
-          phaseText = `Active Break Down confirmed below 0% Fib!`;
+          phaseText = `Active Break Down confirmed below Rolling 30D 0% Fib ($${low.toFixed(2)})!`;
           phaseBadgeClass = "is-danger is-light";
         } else {
           phaseScore = 50;
-          phaseText = `Neutral Consolidation — closes are balanced across 50% Fib.`;
+          phaseText = `Neutral Consolidation — 30D Rolling closes are balanced across 50% Fib ($${fib50.toFixed(2)}).`;
           phaseBadgeClass = "is-dark";
         }
       }
@@ -923,15 +923,12 @@
       document.getElementById('factorPhaseDetail').textContent = phaseText;
 
       // --- Factor 3: Safe Haven Demand (Capital Flow) ---
-      // Weight: 30%
       let shScore = 50;
       let shText = "Safe Haven flow neutral";
       let shBadgeClass = "is-dark";
 
       const safeHaven = rawPayload.safe_haven_demand;
       if (safeHaven && safeHaven.score !== undefined) {
-        // High CNN score = Greed (stocks outperforming bonds, risk-on) -> Breakout
-        // Low CNN score = Fear (flight into Treasuries, risk-off) -> Breakdown
         shScore = Number(safeHaven.score);
         const shLatest = getLatestDataPoint(safeHaven);
         const shSpreadStr = shLatest ? ` (${shLatest.y >= 0 ? '+' : ''}${shLatest.y.toFixed(2)}% spread)` : "";
@@ -953,10 +950,9 @@
       document.getElementById('factorShDetail').textContent = shText;
 
       // --- Composite Probability Calculation ---
-      // Scale: 0 (Extreme Breakdown) to 100 (Extreme Breakout)
       const compositeScore = Math.max(0, Math.min(100, (0.35 * mmScore) + (0.35 * phaseScore) + (0.30 * shScore)));
 
-      // Needle Rotation: 0 -> -90 deg, 50 -> 0 deg, 100 -> +90 deg
+      // Needle Rotation
       const deg = (compositeScore / 100) * 180 - 90;
       document.getElementById('bbNeedle').style.transform = `rotate(${deg}deg)`;
       document.getElementById('bbScoreVal').textContent = compositeScore.toFixed(1);
@@ -1227,6 +1223,7 @@
       }
     }
 
+    // Fetches the active mode for the Fibonacci Tab (calendar or rolling)
     async function fetchFibonacci(mode = 'calendar') {
       currentFibMode = mode;
       try {
@@ -1236,13 +1233,24 @@
           document.getElementById('fibSubtitle').textContent = 
             `Period: ${currentFibData.period} (${currentFibData.start_date} to ${currentFibData.end_date}) | 0% = Low ($${currentFibData.lowest_close}) → 100% = High ($${currentFibData.highest_close})`;
           renderFibonacciTab(currentFibData);
-
-          if (currentRawData) {
-            updateBreakoutBreakdownGauge(currentRawData, currentFibData);
-          }
         }
       } catch (err) {
         console.error('Fibonacci fetch error:', err);
+      }
+    }
+
+    // Specifically fetches ROLLING 30-DAY Fibonacci for the Breakout-Breakdown Gauge
+    async function fetchRollingFibonacciForGauge() {
+      try {
+        const res = await fetch('/api/spy/fibonacci?mode=rolling');
+        if (res.ok) {
+          rollingFibData = await res.json();
+          if (currentRawData) {
+            updateBreakoutBreakdownGauge(currentRawData, rollingFibData);
+          }
+        }
+      } catch (err) {
+        console.error('Rolling Fib for gauge fetch error:', err);
       }
     }
 
@@ -1395,13 +1403,11 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. SPY Fibonacci Retracements
+        // 3. Tab Fibonacci Data (User Selected Mode: calendar or rolling)
         await fetchFibonacci(currentFibMode);
 
-        // 4. Update the Breakout-Breakdown Gauge using raw CNN data + Fibonacci float phase
-        if (currentRawData && currentFibData) {
-          updateBreakoutBreakdownGauge(currentRawData, currentFibData);
-        }
+        // 4. ROLLING 30-DAY Fibonacci specifically for the Breakout-Breakdown Gauge
+        await fetchRollingFibonacciForGauge();
 
         // 5. Daily History Series (/api/history?last=30d)
         const histRes = await fetch('/api/history?last=30d');
