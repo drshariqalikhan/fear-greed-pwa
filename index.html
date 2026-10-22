@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>CNN Fear &amp; Greed + SPY Fibonacci | Market Sentiment PWA</title>
-  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index and SPY Fibonacci Retracements with Float Up/Down Consolidation Phases.">
+  <meta name="description" content="PWA dashboard for CNN Fear & Greed Index, Breakout-Breakdown Probability Gauge, and SPY Fibonacci Retracements.">
   <meta name="theme-color" content="#12161a">
 
   <!-- Embedded Web App Manifest -->
@@ -106,6 +106,12 @@
       color: #cbd5e1;
       border: 1px solid rgba(148, 163, 184, 0.3);
     }
+    .factor-item {
+      background: rgba(15, 23, 42, 0.5);
+      border: 1px solid #1e293b;
+      border-radius: 6px;
+      padding: 0.65rem 0.85rem;
+    }
   </style>
 </head>
 <body>
@@ -149,7 +155,7 @@
       <div class="level-right">
         <div class="tabs is-toggle is-small is-toggle-rounded">
           <ul>
-            <li class="is-active" data-tab="tab-overview"><a>Overview (<code>/get</code>)</a></li>
+            <li class="is-active" data-tab="tab-overview"><a>Overview (Home)</a></li>
             <li data-tab="tab-indicators"><a>7 Indicators (Raw &amp; Score)</a></li>
             <li data-tab="tab-fibonacci"><a>📐 SPY Fibonacci (1M)</a></li>
             <li data-tab="tab-history"><a>History (<code>/history</code>)</a></li>
@@ -159,13 +165,14 @@
       </div>
     </div>
 
-    <!-- TAB 1: OVERVIEW -->
+    <!-- TAB 1: OVERVIEW (HOME PAGE WITH 2 GAUGES) -->
     <section id="tab-overview" class="tab-content">
       <div class="columns is-multiline">
+        <!-- Gauge 1: Fear & Greed Index -->
         <div class="column is-12-tablet is-6-desktop">
-          <div class="card has-background-darker p-5">
-            <h2 class="title is-5 has-text-centered mb-2">Fear &amp; Greed Index</h2>
-            <p class="subtitle is-7 has-text-centered has-text-grey">Endpoint: <code>fear_greed.get_score()</code> &amp; <code>fear_greed.get_rating()</code></p>
+          <div class="card has-background-darker p-5 h-100">
+            <h2 class="title is-5 has-text-centered mb-1">CNN Fear &amp; Greed Index</h2>
+            <p class="subtitle is-7 has-text-centered has-text-grey">Market Participant Sentiment</p>
             
             <div class="gauge-container py-3">
               <svg viewBox="0 0 300 170" width="100%">
@@ -185,11 +192,9 @@
                   <line x1="150" y1="140" x2="150" y2="40" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
                   <polygon points="146,55 154,55 150,30" fill="#f8fafc"/>
                 </g>
-                <text x="30" y="162" fill="#64748b" font-size="11" text-anchor="middle">0</text>
-                <text x="90" y="70" fill="#64748b" font-size="10" text-anchor="middle">25</text>
+                <text x="30" y="162" fill="#64748b" font-size="11" text-anchor="middle">0 (Fear)</text>
                 <text x="150" y="45" fill="#64748b" font-size="10" text-anchor="middle">50</text>
-                <text x="210" y="70" fill="#64748b" font-size="10" text-anchor="middle">75</text>
-                <text x="270" y="162" fill="#64748b" font-size="11" text-anchor="middle">100</text>
+                <text x="270" y="162" fill="#64748b" font-size="11" text-anchor="middle">100 (Greed)</text>
               </svg>
             </div>
 
@@ -203,8 +208,92 @@
           </div>
         </div>
 
+        <!-- Gauge 2: Breakout-Breakdown Probability Gauge -->
         <div class="column is-12-tablet is-6-desktop">
-          <div class="card has-background-darker p-5">
+          <div class="card has-background-darker p-5 h-100">
+            <h2 class="title is-5 has-text-centered mb-1">⚡ Breakout-Breakdown Gauge</h2>
+            <p class="subtitle is-7 has-text-centered has-text-grey">Market Maker vs Technical Probability Model</p>
+            
+            <div class="gauge-container py-3">
+              <svg viewBox="0 0 300 170" width="100%">
+                <defs>
+                  <linearGradient id="bbGaugeGrad" x1="0%" y1="0%" x2="100%" y2="0%">
+                    <stop offset="0%" stop-color="#ef4444" />
+                    <stop offset="35%" stop-color="#fb923c" />
+                    <stop offset="50%" stop-color="#ffeaa7" />
+                    <stop offset="65%" stop-color="#38bdf8" />
+                    <stop offset="100%" stop-color="#22c55e" />
+                  </linearGradient>
+                </defs>
+                <path d="M 30 140 A 120 120 0 0 1 270 140" fill="none" stroke="#242e42" stroke-width="22" stroke-linecap="round"/>
+                <path d="M 30 140 A 120 120 0 0 1 270 140" fill="none" stroke="url(#bbGaugeGrad)" stroke-width="20" stroke-linecap="round"/>
+                <circle cx="150" cy="140" r="10" fill="#cbd5e1" />
+                <g id="bbNeedle" class="gauge-needle" style="transform: rotate(0deg);">
+                  <line x1="150" y1="140" x2="150" y2="40" stroke="#f8fafc" stroke-width="4" stroke-linecap="round"/>
+                  <polygon points="146,55 154,55 150,30" fill="#f8fafc"/>
+                </g>
+                <text x="35" y="162" fill="#ef4444" font-size="10" font-weight="bold" text-anchor="middle">Break Down</text>
+                <text x="150" y="45" fill="#64748b" font-size="10" text-anchor="middle">Neutral (50)</text>
+                <text x="265" y="162" fill="#22c55e" font-size="10" font-weight="bold" text-anchor="middle">Break Out</text>
+              </svg>
+            </div>
+
+            <div class="has-text-centered">
+              <span id="bbScoreVal" class="is-size-1 has-text-weight-bold">--</span>
+              <span class="has-text-grey is-size-4">/100</span>
+              <div class="mt-2">
+                <span id="bbRatingBadge" class="tag is-medium sentiment-badge" style="background:#94a3b8; color:#1a202c;">Calculating Bias...</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2, Col 1: 3 Probability Drivers Breakdown -->
+        <div class="column is-12-tablet is-6-desktop">
+          <div class="card has-background-darker p-5 h-100">
+            <h2 class="title is-5 mb-2">Breakout-Breakdown Drivers</h2>
+            <p class="subtitle is-7 has-text-grey mb-4">Underlying inputs dictating the breakout/breakdown probability.</p>
+
+            <div class="is-flex is-flex-direction-column gap-3">
+              <!-- Driver 1: MM Positioning -->
+              <div class="factor-item">
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                  <span class="has-text-weight-semibold is-size-7">1. Market Maker Positioning (Inverse Put/Call)</span>
+                  <span class="tag is-small" id="factorMmBadge">Analyzing...</span>
+                </div>
+                <p class="is-size-7 has-text-grey" id="factorMmDetail">
+                  MMs profit by taking opposite side of retail calls/puts. High call demand $\implies$ MMs favor breakdown.
+                </p>
+              </div>
+
+              <!-- Driver 2: Consolidation Float Phase -->
+              <div class="factor-item">
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                  <span class="has-text-weight-semibold is-size-7">2. Price Action Float Phase (Structure)</span>
+                  <span class="tag is-small" id="factorPhaseBadge">Analyzing...</span>
+                </div>
+                <p class="is-size-7 has-text-grey" id="factorPhaseDetail">
+                  Float up consolidation favors an upside breakout; float down consolidation favors breakdown.
+                </p>
+              </div>
+
+              <!-- Driver 3: Safe Haven Demand -->
+              <div class="factor-item">
+                <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
+                  <span class="has-text-weight-semibold is-size-7">3. Safe Haven Demand (Flight to Treasuries)</span>
+                  <span class="tag is-small" id="factorShBadge">Analyzing...</span>
+                </div>
+                <p class="is-size-7 has-text-grey" id="factorShDetail">
+                  Rising flight to Treasuries signals breakdown; risk-on rotation into stocks signals breakout.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2, Col 2: Historical Snapshots -->
+        <div class="column is-12-tablet is-6-desktop">
+          <div class="card has-background-darker p-5 h-100">
             <h2 class="title is-5 mb-1">Historical Snapshots</h2>
             <p class="subtitle is-7 has-text-grey mb-4">From <code>data['history']</code></p>
             
@@ -222,9 +311,9 @@
             </table>
 
             <div class="box has-background-dark py-3 px-4 mt-4">
-              <h3 class="is-size-7 has-text-weight-bold has-text-grey-light uppercase">Indicator Insight</h3>
+              <h3 class="is-size-7 has-text-weight-bold has-text-grey-light uppercase">How to read the two gauges</h3>
               <p class="is-size-7 has-text-grey mt-1">
-                The Fear &amp; Greed index compiles 7 distinct market signals to gauge whether stocks are undervalued (extreme fear) or overbought (extreme greed).
+                The <strong>Fear &amp; Greed Gauge</strong> measures what the crowd is feeling right now. The <strong>Breakout-Breakdown Gauge</strong> forecasts where institutional market makers and technical flows are positioned to force price next.
               </p>
             </div>
           </div>
@@ -298,7 +387,7 @@
       <div class="card has-background-darker p-4 mb-4">
         <div class="is-flex is-justify-content-space-between is-align-items-center is-flex-wrap-wrap gap-2 mb-2">
           <h3 class="is-size-6 has-text-weight-bold">SPY Daily HLC Candles &amp; Consolidation Float Phases</h3>
-          <!-- Updated 5-Phase Legend -->
+          <!-- 5-Phase Legend -->
           <div class="is-flex is-align-items-center is-flex-wrap-wrap gap-2 is-size-7">
             <span class="phase-pill breakout">🚀 Break Out (Low &gt; Prev High &amp; Close &gt; 100%)</span>
             <span class="phase-pill breakdown">🔻 Break Down (High &lt; Prev Low &amp; Close &lt; 0%)</span>
@@ -401,7 +490,7 @@
        1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v9';
+      const CACHE_NAME = 'fear-greed-singlefile-v10';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -666,17 +755,8 @@
     }
 
     /* ==========================================================================
-       3. PRICE ACTION PHASE CLASSIFICATION WITH CONSOLIDATION FLOAT UP/DOWN
+       3. PRICE ACTION PHASE CLASSIFICATION (WITH FLOAT UP / DOWN)
        ========================================================================== */
-    /**
-     * Evaluates all days and classifies into:
-     * - Break Out: (Low > Prev High) AND (Close > Fib 100%)
-     * - Break Down: (High < Prev Low) AND (Close < Fib 0%)
-     * - Consolidation:
-     *    * Float Up Consolidation: >50% of consolidation closes are ABOVE 50% Fib
-     *    * Float Down Consolidation: >50% of consolidation closes are BELOW 50% Fib
-     *    * Neutral Consolidation: Remaining times (balanced/tied <=50%)
-     */
     function classifyAllPricePhases(history, fib0, fib50, fib100) {
       if (!history || history.length === 0) return [];
 
@@ -724,7 +804,6 @@
             detail: `Zero Overlap (High < Prev Low) & Close $${cClose.toFixed(2)} < 0% Fib ($${fib0.toFixed(2)})`
           });
         } else {
-          // Consolidation Day: Track close relative to 50% Fib
           consolTotal++;
           if (cClose > fib50) {
             consolAbove50++;
@@ -763,6 +842,152 @@
       return results;
     }
 
+    /* ==========================================================================
+       4. BREAKOUT-BREAKDOWN PROBABILITY GAUGE MODEL (HOME PAGE)
+       ========================================================================== */
+    function updateBreakoutBreakdownGauge(rawPayload, fibData) {
+      if (!rawPayload) return;
+
+      // --- Factor 1: Market Maker Positioning (Inverse Put/Call Ratio) ---
+      // Weight: 35%
+      let mmScore = 50;
+      let mmText = "Neutral / Balanced";
+      let mmBadgeClass = "is-dark";
+
+      const putCall = rawPayload.put_call_options;
+      if (putCall && putCall.score !== undefined) {
+        // High CNN score = retail is greedy buying calls (low P/C ratio)
+        // MMs are short calls -> MMs will push price down to profit.
+        // Therefore, Breakout probability from MM positioning = 100 - putCall.score
+        mmScore = 100 - Number(putCall.score);
+
+        const pcLatest = getLatestDataPoint(putCall);
+        const pcRatioStr = pcLatest ? ` (P/C Ratio: ${pcLatest.y.toFixed(2)})` : "";
+
+        if (mmScore > 55) {
+          mmText = `Favors Break Out${pcRatioStr} — High retail put loading forces MMs to squeeze price upward.`;
+          mmBadgeClass = "is-success is-light";
+        } else if (mmScore < 45) {
+          mmText = `Favors Break Down${pcRatioStr} — Heavy retail call volume induces MMs to pin/push price down.`;
+          mmBadgeClass = "is-danger is-light";
+        } else {
+          mmText = `Neutral MM Flow${pcRatioStr} — Put/Call volume near equilibrium.`;
+          mmBadgeClass = "is-dark";
+        }
+      }
+
+      document.getElementById('factorMmBadge').className = `tag is-small ${mmBadgeClass}`;
+      document.getElementById('factorMmBadge').textContent = mmScore > 55 ? "Favors Break Out" : (mmScore < 45 ? "Favors Break Down" : "Neutral");
+      document.getElementById('factorMmDetail').textContent = mmText;
+
+      // --- Factor 2: Consolidation Float Phase (Technical Structure) ---
+      // Weight: 35%
+      let phaseScore = 50;
+      let phaseText = "Neutral Consolidation (Balanced closes around 50% Fib)";
+      let phaseBadgeClass = "is-dark";
+
+      if (fibData && fibData.history && fibData.history.length > 0) {
+        const low = Number(fibData.lowest_close);
+        const high = Number(fibData.highest_close);
+        const range = Number(fibData.range);
+        const fib50 = low + 0.500 * range;
+
+        const phases = classifyAllPricePhases(fibData.history, low, fib50, high);
+        const lastPhase = phases[phases.length - 1];
+
+        if (lastPhase.phase === 'consolidation-up') {
+          phaseScore = 80;
+          phaseText = `Favors Break Out — ${lastPhase.detail}`;
+          phaseBadgeClass = "is-info is-light";
+        } else if (lastPhase.phase === 'consolidation-down') {
+          phaseScore = 20;
+          phaseText = `Favors Break Down — ${lastPhase.detail}`;
+          phaseBadgeClass = "is-warning is-light";
+        } else if (lastPhase.phase === 'breakout') {
+          phaseScore = 95;
+          phaseText = `Active Break Out confirmed above 100% Fib!`;
+          phaseBadgeClass = "is-success is-light";
+        } else if (lastPhase.phase === 'breakdown') {
+          phaseScore = 5;
+          phaseText = `Active Break Down confirmed below 0% Fib!`;
+          phaseBadgeClass = "is-danger is-light";
+        } else {
+          phaseScore = 50;
+          phaseText = `Neutral Consolidation — closes are balanced across 50% Fib.`;
+          phaseBadgeClass = "is-dark";
+        }
+      }
+
+      document.getElementById('factorPhaseBadge').className = `tag is-small ${phaseBadgeClass}`;
+      document.getElementById('factorPhaseBadge').textContent = phaseScore > 55 ? "Favors Break Out" : (phaseScore < 45 ? "Favors Break Down" : "Neutral");
+      document.getElementById('factorPhaseDetail').textContent = phaseText;
+
+      // --- Factor 3: Safe Haven Demand (Capital Flow) ---
+      // Weight: 30%
+      let shScore = 50;
+      let shText = "Safe Haven flow neutral";
+      let shBadgeClass = "is-dark";
+
+      const safeHaven = rawPayload.safe_haven_demand;
+      if (safeHaven && safeHaven.score !== undefined) {
+        // High CNN score = Greed (stocks outperforming bonds, risk-on) -> Breakout
+        // Low CNN score = Fear (flight into Treasuries, risk-off) -> Breakdown
+        shScore = Number(safeHaven.score);
+        const shLatest = getLatestDataPoint(safeHaven);
+        const shSpreadStr = shLatest ? ` (${shLatest.y >= 0 ? '+' : ''}${shLatest.y.toFixed(2)}% spread)` : "";
+
+        if (shScore > 55) {
+          shText = `Favors Break Out${shSpreadStr} — Capital flowing out of Treasuries into equities.`;
+          shBadgeClass = "is-success is-light";
+        } else if (shScore < 45) {
+          shText = `Favors Break Down${shSpreadStr} — Capital seeking safety in Treasuries over stocks.`;
+          shBadgeClass = "is-danger is-light";
+        } else {
+          shText = `Neutral Capital Flow${shSpreadStr} — No clear flight to safety or risk assets.`;
+          shBadgeClass = "is-dark";
+        }
+      }
+
+      document.getElementById('factorShBadge').className = `tag is-small ${shBadgeClass}`;
+      document.getElementById('factorShBadge').textContent = shScore > 55 ? "Favors Break Out" : (shScore < 45 ? "Favors Break Down" : "Neutral");
+      document.getElementById('factorShDetail').textContent = shText;
+
+      // --- Composite Probability Calculation ---
+      // Scale: 0 (Extreme Breakdown) to 100 (Extreme Breakout)
+      const compositeScore = Math.max(0, Math.min(100, (0.35 * mmScore) + (0.35 * phaseScore) + (0.30 * shScore)));
+
+      // Needle Rotation: 0 -> -90 deg, 50 -> 0 deg, 100 -> +90 deg
+      const deg = (compositeScore / 100) * 180 - 90;
+      document.getElementById('bbNeedle').style.transform = `rotate(${deg}deg)`;
+      document.getElementById('bbScoreVal').textContent = compositeScore.toFixed(1);
+
+      const bbBadge = document.getElementById('bbRatingBadge');
+      if (compositeScore >= 65) {
+        bbBadge.textContent = "High Break Out Probability";
+        bbBadge.style.backgroundColor = "#22c55e";
+        bbBadge.style.color = "#ffffff";
+      } else if (compositeScore >= 55) {
+        bbBadge.textContent = "Moderate Break Out Bias";
+        bbBadge.style.backgroundColor = "#38bdf8";
+        bbBadge.style.color = "#1a202c";
+      } else if (compositeScore <= 35) {
+        bbBadge.textContent = "High Break Down Probability";
+        bbBadge.style.backgroundColor = "#ef4444";
+        bbBadge.style.color = "#ffffff";
+      } else if (compositeScore <= 45) {
+        bbBadge.textContent = "Moderate Break Down Bias";
+        bbBadge.style.backgroundColor = "#fb923c";
+        bbBadge.style.color = "#ffffff";
+      } else {
+        bbBadge.textContent = "Neutral / Consolidation";
+        bbBadge.style.backgroundColor = "#94a3b8";
+        bbBadge.style.color = "#1a202c";
+      }
+    }
+
+    /* ==========================================================================
+       5. SPY FIBONACCI TAB & CANVAS RENDERING
+       ========================================================================== */
     function renderFibonacciTab(data) {
       if (!data) return;
 
@@ -772,7 +997,6 @@
       const range = Number(data.range);
       const rangePct = ((range / low) * 100).toFixed(2);
 
-      // Boundaries: 0.0% is Lowest Close, 50.0% is Midpoint, 100.0% is Highest Close
       const fib0 = low;
       const fib50 = low + 0.500 * range;
       const fib100 = high;
@@ -793,11 +1017,9 @@
         statusSpan.innerHTML = `<span class="tag is-info is-light">${pctFromLow}% in Range (Swing: ${rangePct}%)</span>`;
       }
 
-      // Classify all days in series
       const hist = data.history || [];
       const classifiedPhases = classifyAllPricePhases(hist, fib0, fib50, fib100);
 
-      // Active Price Phase on Most Recent Candle
       if (classifiedPhases.length > 0) {
         const lastPhaseInfo = classifiedPhases[classifiedPhases.length - 1];
         const badgeContainer = document.getElementById('currentPhaseBadge');
@@ -807,7 +1029,6 @@
         detailContainer.textContent = lastPhaseInfo.detail;
       }
 
-      // Render Levels Table
       const tbody = document.getElementById('fibTableBody');
       tbody.innerHTML = data.levels.map(lvl => {
         const p = Number(lvl.price);
@@ -846,7 +1067,6 @@
       drawFibChart(data, fib0, fib50, fib100, classifiedPhases);
     }
 
-    // Draw SPY Fibonacci Canvas Chart with Updated Phase Zones & Daily HLC Candles
     function drawFibChart(data, fib0, fib50, fib100, classifiedPhases) {
       const canvas = document.getElementById('fibChart');
       if (!canvas || !data || !data.history || data.history.length === 0) return;
@@ -891,26 +1111,25 @@
       const count = history.length;
       const stepX = (w - padLeft - padRight) / (count || 1);
 
-      // 1. Shaded Background Columns for Price Action Phases
+      // Shaded Background Columns for Price Action Phases
       history.forEach((pt, i) => {
         const xStart = padLeft + i * stepX;
         const phaseInfo = classifiedPhases[i] || { phase: 'consolidation-neutral' };
 
         if (phaseInfo.phase === 'breakout') {
-          ctx.fillStyle = 'rgba(34, 197, 94, 0.20)'; // Break Out Green
+          ctx.fillStyle = 'rgba(34, 197, 94, 0.20)';
         } else if (phaseInfo.phase === 'breakdown') {
-          ctx.fillStyle = 'rgba(239, 68, 68, 0.20)'; // Break Down Red
+          ctx.fillStyle = 'rgba(239, 68, 68, 0.20)';
         } else if (phaseInfo.phase === 'consolidation-up') {
-          ctx.fillStyle = 'rgba(56, 189, 248, 0.12)'; // Float Up Sky Blue
+          ctx.fillStyle = 'rgba(56, 189, 248, 0.12)';
         } else if (phaseInfo.phase === 'consolidation-down') {
-          ctx.fillStyle = 'rgba(251, 146, 60, 0.12)'; // Float Down Amber
+          ctx.fillStyle = 'rgba(251, 146, 60, 0.12)';
         } else {
-          ctx.fillStyle = 'rgba(148, 163, 184, 0.05)'; // Neutral Slate
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.05)';
         }
 
         ctx.fillRect(xStart, padTop, stepX, h - padTop - padBottom);
 
-        // Day separator
         ctx.strokeStyle = 'rgba(255, 255, 255, 0.03)';
         ctx.lineWidth = 1;
         ctx.beginPath();
@@ -919,7 +1138,7 @@
         ctx.stroke();
       });
 
-      // 2. Fibonacci Reference Horizontal Lines
+      // Fibonacci Reference Lines
       data.levels.forEach(lvl => {
         const y = getY(lvl.price);
         ctx.beginPath();
@@ -937,7 +1156,7 @@
         ctx.fillText(`$${lvl.price.toFixed(2)} (${(lvl.ratio * 100).toFixed(0)}%)`, padLeft - 6, y + 3);
       });
 
-      // 3. Current Price Horizontal Marker Line
+      // Current Price Line
       const curY = getY(cur);
       ctx.beginPath();
       ctx.strokeStyle = '#38bdf8';
@@ -953,7 +1172,7 @@
       ctx.textAlign = 'left';
       ctx.fillText(`NOW: $${cur.toFixed(2)}`, w - padRight + 4, curY + 3);
 
-      // 4. Daily HLC Candles (High, Low, Close only)
+      // Daily HLC Candles
       const tickLength = Math.max(4, Math.min(10, stepX * 0.45));
 
       history.forEach((pt, i) => {
@@ -969,7 +1188,6 @@
         const phaseInfo = classifiedPhases[i] || { phase: 'consolidation-neutral', color: '#94a3b8' };
         const candleColor = phaseInfo.color;
 
-        // Vertical Wick: High to Low
         ctx.beginPath();
         ctx.strokeStyle = candleColor;
         ctx.lineWidth = 2.0;
@@ -977,7 +1195,6 @@
         ctx.lineTo(x, yLow);
         ctx.stroke();
 
-        // Horizontal Caps
         ctx.beginPath();
         ctx.lineWidth = 1.2;
         ctx.moveTo(x - 2, yHigh);
@@ -986,21 +1203,19 @@
         ctx.lineTo(x + 2, yLow);
         ctx.stroke();
 
-        // Horizontal Right Tick: Close
         ctx.beginPath();
         ctx.lineWidth = 2.8;
         ctx.moveTo(x, yClose);
         ctx.lineTo(x + tickLength, yClose);
         ctx.stroke();
 
-        // Phase Icon Marker on Top
         ctx.beginPath();
         ctx.arc(x, padTop + 8, 3.5, 0, Math.PI * 2);
         ctx.fillStyle = phaseInfo.color;
         ctx.fill();
       });
 
-      // 5. X-Axis Date Labels
+      // X-Axis Date Labels
       ctx.fillStyle = '#64748b';
       ctx.font = '9px monospace';
       ctx.textAlign = 'center';
@@ -1021,6 +1236,10 @@
           document.getElementById('fibSubtitle').textContent = 
             `Period: ${currentFibData.period} (${currentFibData.start_date} to ${currentFibData.end_date}) | 0% = Low ($${currentFibData.lowest_close}) → 100% = High ($${currentFibData.highest_close})`;
           renderFibonacciTab(currentFibData);
+
+          if (currentRawData) {
+            updateBreakoutBreakdownGauge(currentRawData, currentFibData);
+          }
         }
       } catch (err) {
         console.error('Fibonacci fetch error:', err);
@@ -1028,7 +1247,7 @@
     }
 
     /* ==========================================================================
-       4. GAUGE, SNAPSHOTS, HISTORY TIMELINE & MASTER FETCH
+       6. GAUGE, SNAPSHOTS, HISTORY TIMELINE & MASTER FETCH
        ========================================================================== */
     function updateGauge(score, rating) {
       const needle = document.getElementById('needle');
@@ -1168,7 +1387,7 @@
           renderSnapshots(getData.history);
         }
 
-        // 2. Raw CNN Payload (/api/raw) for Raw Indicator Values
+        // 2. Raw CNN Payload (/api/raw)
         const rawRes = await fetch('/api/raw');
         if (rawRes.ok) {
           currentRawData = await rawRes.json();
@@ -1176,10 +1395,15 @@
           document.getElementById('rawJsonBlock').textContent = JSON.stringify(currentRawData, null, 2);
         }
 
-        // 3. SPY Fibonacci Retracements with Phase-Colored HLC Candles
+        // 3. SPY Fibonacci Retracements
         await fetchFibonacci(currentFibMode);
 
-        // 4. Daily History Series (/api/history?last=30d)
+        // 4. Update the Breakout-Breakdown Gauge using raw CNN data + Fibonacci float phase
+        if (currentRawData && currentFibData) {
+          updateBreakoutBreakdownGauge(currentRawData, currentFibData);
+        }
+
+        // 5. Daily History Series (/api/history?last=30d)
         const histRes = await fetch('/api/history?last=30d');
         if (histRes.ok) {
           currentHistoryData = await histRes.json();
