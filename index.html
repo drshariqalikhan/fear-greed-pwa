@@ -212,7 +212,7 @@
         <div class="column is-12-tablet is-6-desktop">
           <div class="card has-background-darker p-5 h-100">
             <h2 class="title is-5 has-text-centered mb-1">⚡ Breakout-Breakdown Gauge</h2>
-            <p class="subtitle is-7 has-text-centered has-text-grey">Market Maker vs <strong>Rolling 30-Day SPY</strong> Probability Model</p>
+            <p class="subtitle is-7 has-text-centered has-text-grey">Market Maker vs <strong>Rolling 30-Day SPY</strong> Median Range Model</p>
             
             <div class="gauge-container py-3">
               <svg viewBox="0 0 300 170" width="100%">
@@ -266,14 +266,14 @@
                 </p>
               </div>
 
-              <!-- Driver 2: Rolling 30D Consolidation Float Phase -->
+              <!-- Driver 2: Rolling 30D Consolidation Float Phase (Median Proximity Model) -->
               <div class="factor-item">
                 <div class="is-flex is-justify-content-space-between is-align-items-center mb-1">
-                  <span class="has-text-weight-semibold is-size-7">2. Price Action Float Phase (Rolling 30-Day SPY)</span>
+                  <span class="has-text-weight-semibold is-size-7">2. Price Action Float Phase (Rolling 30D Median Model)</span>
                   <span class="tag is-small" id="factorPhaseBadge">Analyzing...</span>
                 </div>
                 <p class="is-size-7 has-text-grey" id="factorPhaseDetail">
-                  Rolling 30-day float up consolidation favors break out; float down consolidation favors breakdown.
+                  Neutral = 50:50. Float Up/Down probability calculated by median price proximity to 100% or 0% Fib.
                 </p>
               </div>
 
@@ -313,7 +313,7 @@
             <div class="box has-background-dark py-3 px-4 mt-4">
               <h3 class="is-size-7 has-text-weight-bold has-text-grey-light uppercase">How to read the two gauges</h3>
               <p class="is-size-7 has-text-grey mt-1">
-                The <strong>Fear &amp; Greed Gauge</strong> measures crowd sentiment. The <strong>Breakout-Breakdown Gauge</strong> uses Market Maker positioning, safe haven flows, and <strong>Rolling 30-Day Fibonacci structure</strong> to forecast the highest-probability path.
+                The <strong>Fear &amp; Greed Gauge</strong> measures crowd sentiment. The <strong>Breakout-Breakdown Gauge</strong> pairs market maker positioning with <strong>Rolling 30-Day Median Price Action</strong> to measure breakout proximity.
               </p>
             </div>
           </div>
@@ -490,7 +490,7 @@
        1. INLINE SERVICE WORKER (Single-File PWA Engine)
        ========================================================================== */
     const swScriptContent = `
-      const CACHE_NAME = 'fear-greed-singlefile-v11';
+      const CACHE_NAME = 'fear-greed-singlefile-v12';
       const STATIC_ASSETS = [
         '/',
         'https://cdn.jsdelivr.net/npm/bulma@1.0.2/css/bulma.min.css'
@@ -563,7 +563,7 @@
     let currentRawData = null;
     let currentHistoryData = [];
     let currentFibData = null;
-    let rollingFibData = null; // Stored specifically for Breakout-Breakdown Gauge
+    let rollingFibData = null;
     let currentFibMode = 'calendar';
 
     function formatRating(rating) {
@@ -589,6 +589,14 @@
     function getLatestDataPoint(indicatorObj) {
       if (!indicatorObj || !indicatorObj.data || !indicatorObj.data.length) return null;
       return indicatorObj.data[indicatorObj.data.length - 1];
+    }
+
+    // Helper to calculate median of an array of numbers
+    function getMedian(arr) {
+      if (!arr || arr.length === 0) return null;
+      const sorted = [...arr].sort((a, b) => a - b);
+      const mid = Math.floor(sorted.length / 2);
+      return sorted.length % 2 !== 0 ? sorted[mid] : (sorted[mid - 1] + sorted[mid]) / 2;
     }
 
     function extractDetailedIndicators(raw) {
@@ -844,7 +852,7 @@
     }
 
     /* ==========================================================================
-       4. BREAKOUT-BREAKDOWN PROBABILITY GAUGE (ANCHORED TO ROLLING 30D FIB)
+       4. BREAKOUT-BREAKDOWN PROBABILITY GAUGE (MEDIAN PROXIMITY MODEL)
        ========================================================================== */
     function updateBreakoutBreakdownGauge(rawPayload, rollingFib) {
       if (!rawPayload) return;
@@ -856,11 +864,7 @@
 
       const putCall = rawPayload.put_call_options;
       if (putCall && putCall.score !== undefined) {
-        // High CNN score = retail is greedy buying calls (low P/C ratio)
-        // MMs are short calls -> MMs will push price down to profit.
-        // Therefore, Breakout probability from MM positioning = 100 - putCall.score
         mmScore = 100 - Number(putCall.score);
-
         const pcLatest = getLatestDataPoint(putCall);
         const pcRatioStr = pcLatest ? ` (P/C Ratio: ${pcLatest.y.toFixed(2)})` : "";
 
@@ -880,8 +884,8 @@
       document.getElementById('factorMmBadge').textContent = mmScore > 55 ? "Favors Break Out" : (mmScore < 45 ? "Favors Break Down" : "Neutral");
       document.getElementById('factorMmDetail').textContent = mmText;
 
-      // --- Factor 2: ROLLING 30-DAY Consolidation Float Phase ---
-      let phaseScore = 50;
+      // --- Factor 2: ROLLING 30D Consolidation Phase with Median Proximity Model ---
+      let phaseScore = 50.0;
       let phaseText = "Evaluating Rolling 30-Day SPY Structure...";
       let phaseBadgeClass = "is-dark";
 
@@ -896,30 +900,55 @@
         const lastPhase = phases[phases.length - 1];
 
         if (lastPhase.phase === 'consolidation-up') {
-          phaseScore = 80;
-          phaseText = `Favors Break Out — 30D Rolling Structure: ${lastPhase.detail}`;
+          // Filter closing prices strictly in the float-up price range (> 50% Fib)
+          const floatUpCloses = rollingFib.history
+            .map(h => Number(h.close))
+            .filter(c => c > fib50);
+          
+          const medianPrice = getMedian(floatUpCloses) || fib50;
+
+          // Proximity of medianPrice toward 100% Fib in range [fib50, high]
+          const proximityRatio = Math.max(0, Math.min(1, (medianPrice - fib50) / (high - fib50 || 1)));
+          phaseScore = 50.0 + (proximityRatio * 50.0);
+          const distTo100 = high - medianPrice;
+
+          phaseText = `Favors Break Out — Float Up Range Median: $${medianPrice.toFixed(2)} (within $${distTo100.toFixed(2)} of 100% Fib $${high.toFixed(2)}). Factor Score: ${phaseScore.toFixed(1)}%.`;
           phaseBadgeClass = "is-info is-light";
         } else if (lastPhase.phase === 'consolidation-down') {
-          phaseScore = 20;
-          phaseText = `Favors Break Down — 30D Rolling Structure: ${lastPhase.detail}`;
+          // Filter closing prices strictly in the float-down price range (< 50% Fib)
+          const floatDownCloses = rollingFib.history
+            .map(h => Number(h.close))
+            .filter(c => c < fib50);
+
+          const medianPrice = getMedian(floatDownCloses) || fib50;
+
+          // Proximity of medianPrice toward 0% Fib in range [low, fib50]
+          // At medianPrice = fib50 -> phaseScore = 50.0 (neutral boundary)
+          // At medianPrice = low   -> phaseScore = 0.0 (max breakdown probability)
+          const proximityRatio = Math.max(0, Math.min(1, (medianPrice - low) / (fib50 - low || 1)));
+          phaseScore = proximityRatio * 50.0;
+          const distTo0 = medianPrice - low;
+
+          phaseText = `Favors Break Down — Float Down Range Median: $${medianPrice.toFixed(2)} (within $${distTo0.toFixed(2)} of 0% Fib $${low.toFixed(2)}). Factor Score: ${(100 - phaseScore).toFixed(1)}% Breakdown.`;
           phaseBadgeClass = "is-warning is-light";
         } else if (lastPhase.phase === 'breakout') {
-          phaseScore = 95;
+          phaseScore = 95.0;
           phaseText = `Active Break Out confirmed above Rolling 30D 100% Fib ($${high.toFixed(2)})!`;
           phaseBadgeClass = "is-success is-light";
         } else if (lastPhase.phase === 'breakdown') {
-          phaseScore = 5;
+          phaseScore = 5.0;
           phaseText = `Active Break Down confirmed below Rolling 30D 0% Fib ($${low.toFixed(2)})!`;
           phaseBadgeClass = "is-danger is-light";
         } else {
-          phaseScore = 50;
-          phaseText = `Neutral Consolidation — 30D Rolling closes are balanced across 50% Fib ($${fib50.toFixed(2)}).`;
+          // Neutral Consolidation: exact 50:50 probability
+          phaseScore = 50.0;
+          phaseText = `Neutral Consolidation — 30D Rolling closes are balanced across 50% Fib ($${fib50.toFixed(2)}). Factor Score: 50:50.`;
           phaseBadgeClass = "is-dark";
         }
       }
 
       document.getElementById('factorPhaseBadge').className = `tag is-small ${phaseBadgeClass}`;
-      document.getElementById('factorPhaseBadge').textContent = phaseScore > 55 ? "Favors Break Out" : (phaseScore < 45 ? "Favors Break Down" : "Neutral");
+      document.getElementById('factorPhaseBadge').textContent = phaseScore > 55 ? `Break Out Lean (${phaseScore.toFixed(0)}%)` : (phaseScore < 45 ? `Break Down Lean (${(100 - phaseScore).toFixed(0)}%)` : "50:50 Neutral");
       document.getElementById('factorPhaseDetail').textContent = phaseText;
 
       // --- Factor 3: Safe Haven Demand (Capital Flow) ---
@@ -1223,7 +1252,6 @@
       }
     }
 
-    // Fetches the active mode for the Fibonacci Tab (calendar or rolling)
     async function fetchFibonacci(mode = 'calendar') {
       currentFibMode = mode;
       try {
@@ -1239,7 +1267,6 @@
       }
     }
 
-    // Specifically fetches ROLLING 30-DAY Fibonacci for the Breakout-Breakdown Gauge
     async function fetchRollingFibonacciForGauge() {
       try {
         const res = await fetch('/api/spy/fibonacci?mode=rolling');
